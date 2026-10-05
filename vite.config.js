@@ -41,6 +41,17 @@ export default defineConfig(({ mode }) => {
         server: {
             host: "0.0.0.0",
             proxy: {
+                "/ledger/atlas": {
+                    target: API_Endpoint,
+                    changeOrigin: true,
+                    secure: false,
+                    rewrite: (path) => path.replace(/^\/ledger/, ""),
+                },
+                "/atlas": {
+                    target: API_Endpoint,
+                    changeOrigin: true,
+                    secure: false,
+                },
                 "/api": {
                     target: API_Endpoint,
                     changeOrigin: true,
