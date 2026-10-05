@@ -5,6 +5,7 @@
                 <div class="my_refresh">
                     <span>记账管理</span>
                     <el-space>
+                        <el-button @click="onImportBill">导入</el-button>
                         <el-button type="success" @click="onAddBill">记一笔</el-button>
                         <el-button type="primary" :icon="Refresh" @click="onRefresh" :loading="loading">刷新</el-button>
                     </el-space>
@@ -49,6 +50,7 @@
         <add-transactions ref="AddTransactions" />
         <UpdateTransactions ref="UpdateTransactions" />
         <TranDetail ref="TranDetail" />
+        <ImportBill ref="ImportBill" />
     </div>
 </template>
 
@@ -58,6 +60,7 @@ import { ElMessageBox } from "element-plus";
 import MyTable from "../../components/MyTable/MyTable.vue";
 import AddTransactions from "./AddTransactions.vue";
 import UpdateTransactions from "./update.vue";
+import ImportBill from "./import.vue";
 import TranDetail from "./detail.vue";
 import { GetTransactions, Getcategory, DelTransactions } from "../../api/basic.js";
 import { msgcon } from "../../utils/message.js";
@@ -74,6 +77,7 @@ export default {
         AddTransactions,
         UpdateTransactions,
         TranDetail,
+        ImportBill,
     },
     setup() {
         return {
@@ -184,7 +188,9 @@ export default {
             await this.loadGetCategory();
             this.loadGetBill(this.pageSize, this.page);
         },
-
+        onImportBill() {
+            this.$refs.ImportBill.onOpenDialog();
+        },
         onAddBill() {
             this.$refs.AddTransactions.onOpenDialog();
         },
