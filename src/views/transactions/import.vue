@@ -75,17 +75,17 @@
             </div>
         </div>
 
-        <!-- Footer -->
         <template #footer>
-            <el-button @click="onCloseDialog" :disabled="submitting">取 消</el-button>
-            <el-button type="primary" :loading="submitting" :disabled="parsedData.length === 0" @click="onSubmit">
-                {{ submitting ? `导入中 (${progress.done}/${progress.total})` : `确认导入（${parsedData.length} 条）` }}
+            <el-button style="min-width: 120px" @click="onCloseDialog" :disabled="submitting">取 消</el-button>
+            <el-button style="min-width: 120px" type="primary" :loading="submitting" :disabled="parsedData.length === 0" @click="onSubmit">
+                {{ submitting ? `导入中 (${progress.done}/${progress.total})` : `导入（${parsedData.length} 条）` }}
             </el-button>
         </template>
     </el-dialog>
 </template>
 
 <script>
+import dayjs from "dayjs";
 import { Download, UploadFilled } from "@element-plus/icons-vue";
 import { AddTransactions } from "../../api/basic.js";
 import { msg } from "../../utils/message.ts";
@@ -296,32 +296,14 @@ export default {
         formatOccTime(input) {
             const str = String(input ?? "").trim();
             if (!str) return "";
+            // Already in target format
             if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0800$/.test(str)) return str;
 
-            let y, mo, d, h, mi, s;
-            const m = str.match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})日?(?:[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
-
-            if (m) {
-                y = Number(m[1]);
-                mo = Number(m[2]);
-                d = Number(m[3]);
-                h = Number(m[4] || 0);
-                mi = Number(m[5] || 0);
-                s = Number(m[6] || 0);
-            } else {
-                const dt = new Date(str);
-                if (isNaN(dt.getTime())) return str;
-                const utc8 = new Date(dt.getTime() + 8 * 3600 * 1000);
-                y = utc8.getUTCFullYear();
-                mo = utc8.getUTCMonth() + 1;
-                d = utc8.getUTCDate();
-                h = utc8.getUTCHours();
-                mi = utc8.getUTCMinutes();
-                s = utc8.getUTCSeconds();
-            }
-
-            const pad = (n) => String(n).padStart(2, "0");
-            return `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}+0800`;
+            // Normalize Chinese/slash separators so dayjs can parse
+            const normalized = str.replace(/年|月/g, "-").replace(/日/g, "").replace(/\//g, "-");
+            const d = dayjs(normalized);
+            if (!d.isValid()) return str;
+            return d.format("YYYY-MM-DDTHH:mm:ss+0800");
         },
 
         // Build one transaction payload from a CSV row

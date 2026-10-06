@@ -5,7 +5,7 @@
                 <div class="my_refresh">
                     <span>记账管理</span>
                     <el-space>
-                        <el-button @click="onImportBill">导入</el-button>
+                        <el-button type="success" @click="onImportBill">导入</el-button>
                         <el-button type="success" @click="onAddBill">记一笔</el-button>
                         <el-button type="primary" :icon="Refresh" @click="onRefresh" :loading="loading">刷新</el-button>
                     </el-space>
