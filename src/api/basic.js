@@ -29,6 +29,8 @@ export const GetBillDetails = (id) => ajax(`/api/ledger/v1/bill/${id}`, "GET", n
 // 数据总览
 export const GetCycleSummary = (params) => ajax(`/api/ledger/v1/stat/cycle-summary`, "GET", params, null);
 export const GetChartDay = (params) => ajax(`/api/ledger/v1/stat/chart/day`, "GET", params, null);
+export const GetChartCategory = (params) => ajax(`/api/ledger/v1/stat/category`, "GET", params, null);
+export const GetChartExpenseRank = (params) => ajax(`/api/ledger/v1/stat/expense-rank`, "GET", params, null);
 
 // 分类管理
 //    GET /v1/category                    查询记账单
