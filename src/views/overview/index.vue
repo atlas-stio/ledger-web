@@ -5,16 +5,22 @@
                 <div>
                     <el-space>
                         <el-text>
-                            本月收入：
-                            <span style="display: inline-block; width: 80px">{{ incomeTotal }}</span>
+                            本期收入：
+                            <span class="amount income">{{ incomeTotal }}</span>
                         </el-text>
                         <el-text>
-                            本月支出：
-                            <span style="display: inline-block; width: 80px">{{ expendTotal }}</span>
+                            本期支出：
+                            <span class="amount expense">{{ expendTotal }}</span>
                         </el-text>
                     </el-space>
                 </div>
                 <el-space>
+                    <!-- Quick prev / next buttons, only for month / year mode -->
+                    <el-button-group v-if="mode !== 'custom'">
+                        <el-button :icon="ArrowLeft" @click="handleShift(-1)" />
+                        <el-button :icon="ArrowRight" @click="handleShift(1)" />
+                    </el-button-group>
+
                     <el-date-picker
                         v-if="mode === 'year'"
                         v-model="month"
@@ -58,23 +64,36 @@
 
     <div style="padding-top: 10px">
         <div class="chart-wrapper">
-            <div class="chart-item">
+            <!-- Line chart: full-width row, enough horizontal space for daily trend -->
+            <div class="chart-item chart-item--full">
                 <Day ref="dayChartRef" :query-params="chartParams" />
+            </div>
+            <!-- Pie chart and ranking: half-width each, side by side -->
+            <div class="chart-item">
+                <Category ref="categoryChartRef" :query-params="chartParams" />
+            </div>
+            <div class="chart-item">
+                <ExpenseRank ref="expenseRankRef" :query-params="chartParams" />
             </div>
         </div>
     </div>
 </template>
 
 <script>
-import { Refresh } from "@element-plus/icons-vue";
+import { Refresh, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { GetCycleSummary } from "../../api/basic.js";
 import Day from "./charts/day.vue";
+import Category from "./charts/category.vue";
+import ExpenseRank from "./charts/expenseRank.vue";
+
+// Centralized ref names for the three charts, used for batch refresh
+const CHART_REFS = ["dayChartRef", "categoryChartRef", "expenseRankRef"];
 
 export default {
     name: "OverviewIndex",
-    components: { Day },
+    components: { Day, Category, ExpenseRank },
     setup() {
-        return { Refresh };
+        return { Refresh, ArrowLeft, ArrowRight };
     },
     data() {
         return {
@@ -87,25 +106,23 @@ export default {
             expendTotal: 0,
         };
     },
+    created() {
+        this.$globalBus.emit("updateActivePath", "/overview");
+        this.month = this.getCurrentModeDefault();
+        this.handleMonthChange();
+    },
     methods: {
         getRangeParams() {
             const { mode, month, custom } = this;
             if (mode === "custom") {
                 if (!Array.isArray(custom) || custom.length !== 2) return null;
-                return {
-                    from: custom[0],
-                    to: custom[1],
-                };
+                return { from: custom[0], to: custom[1] };
             }
             if (!month) return null;
 
             if (mode === "year") {
-                return {
-                    from: `${month}-01-01`,
-                    to: `${month}-12-31`,
-                };
+                return { from: `${month}-01-01`, to: `${month}-12-31` };
             }
-
             if (mode === "month") {
                 const [y, m] = month.split("-");
                 const lastDay = new Date(y, m, 0).getDate();
@@ -115,6 +132,33 @@ export default {
                 };
             }
             return null;
+        },
+
+        getCurrentModeDefault() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            if (this.mode === "year") return String(year);
+            if (this.mode === "month") return `${year}-${month}`;
+            return "";
+        },
+
+        // Shift the selected period by N units (-1 prev / +1 next)
+        handleShift(step) {
+            if (this.mode === "year") {
+                const year = Number(this.month) + step;
+                this.month = String(year);
+            } else if (this.mode === "month") {
+                const [y, m] = this.month.split("-").map(Number);
+                // Date handles month overflow automatically (e.g. Jan -1 => Dec prev year)
+                const d = new Date(y, m - 1 + step, 1);
+                const yy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                this.month = `${yy}-${mm}`;
+            } else {
+                return;
+            }
+            this.handleMonthChange();
         },
 
         async getSummary() {
@@ -144,15 +188,6 @@ export default {
             this.handleMonthChange();
         },
 
-        getCurrentModeDefault() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, "0");
-            if (this.mode === "year") return String(year);
-            if (this.mode === "month") return `${year}-${month}`;
-            return "";
-        },
-
         async onRefresh() {
             this.loading = true;
             try {
@@ -162,34 +197,49 @@ export default {
             }
         },
 
+        // Refresh all three charts in one pass
         refreshChartComponent() {
             this.$nextTick(() => {
-                const chartRef = this.$refs.dayChartRef;
-                if (chartRef && typeof chartRef.refreshChart === "function") {
-                    chartRef.refreshChart();
-                }
+                CHART_REFS.forEach((key) => {
+                    const ref = this.$refs[key];
+                    ref?.refreshChart?.();
+                });
             });
         },
-    },
-    created() {
-        this.$globalBus.emit("updateActivePath", "/overview");
-        this.month = this.getCurrentModeDefault();
-        this.handleMonthChange();
     },
 };
 </script>
 
 <style scoped lang="less">
-.chart-wrapper {
+.my_refresh {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 12px;
+}
+
+.amount {
+    display: inline-block;
+    min-width: 80px;
+    font-weight: 600;
+
+    &.income {
+        color: #36cbcb;
+    }
+
+    &.expense {
+        color: #f56c6c;
+    }
+}
+
+.chart-wrapper {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
 }
 
 .chart-item {
-    flex: 1;
-    min-width: calc(50%);
-    max-width: calc(100%);
     height: 400px;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
@@ -198,5 +248,17 @@ export default {
     overflow: hidden;
     padding: 20px;
     box-sizing: border-box;
+}
+
+/* Line chart spans the full row */
+.chart-item--full {
+    grid-column: 1 / -1;
+}
+
+/* Narrow screens (mobile / portrait tablet) fall back to a single column */
+@media (max-width: 900px) {
+    .chart-wrapper {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 </style>
