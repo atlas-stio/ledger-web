@@ -93,8 +93,8 @@ import { msg } from "../../utils/message.ts";
 const MAX_CONCURRENCY = 10;
 const LEAVE_TIP = "导入正在进行中，离开页面可能导致数据不完整，确定要离开吗？";
 const TEMPLATE_ROWS = [
-    ["cid", "occ_time", "amount", "remark"],
-    ["1002", "2025-09-24 20:15:42", "-333.12", "示例备注（支出金额为负数）（cid为分类id，在分类管理中查询）"],
+    ["cid", "occ_time", "amount", "remark", "detail"],
+    ["1002", "2025-09-24 20:15:42", "-333.12", "示例备注（支出金额为负数）（cid为分类id，在分类管理中查询）", "可选"],
     ["5006", "2025-09-24 20:15:42", "100", "示例备注（收入金额为正数）"],
 ];
 const TABLE_COLUMNS = [

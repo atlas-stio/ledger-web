@@ -32,7 +32,10 @@
                 <!-- 明细部分 -->
                 <el-form-item label=" ">
                     <div class="detail-top-container">
-                        <el-button type="primary" style="width: 340px" :icon="Plus" @click="addDetailRow">添加明细 </el-button>
+                        <el-button type="primary" style="width: 340px" :icon="Plus" @click="addDetailRow">添加明细</el-button>
+                        <el-tooltip content="复制明细" placement="top">
+                            <el-button link class="copy-btn" :icon="DocumentCopy" style="margin-left: 8px" @click="copyDetailsJson" />
+                        </el-tooltip>
                     </div>
 
                     <div v-for="(row, index) in detailRows" :key="row.id" class="detail-row">
@@ -68,7 +71,7 @@
 </template>
 
 <script>
-import { Plus, Remove } from "@element-plus/icons-vue";
+import { Plus, Remove, DocumentCopy } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import TreeCategorySelect from "./TreeCategorySelect.vue";
 import { AddTransactions } from "../../api/basic.js";
@@ -87,6 +90,7 @@ export default {
         return {
             Plus,
             Remove,
+            DocumentCopy,
         };
     },
     data() {
@@ -143,7 +147,7 @@ export default {
 
             // 表单校验通过后，二次校验分类对象
             if (mainFormValid && !this.formdata.category) {
-                this.$message.error("请选择类别");
+                this.$message.error(msgcon("请选择类别"));
                 return false;
             }
 
@@ -151,19 +155,19 @@ export default {
                 for (let i = 0; i < this.detailRows.length; i++) {
                     const row = this.detailRows[i];
                     if (!row.name) {
-                        this.$message.error(`第${i + 1}行明细：请输入物品名称`);
+                        this.$message.error(msgcon(`第${i + 1}行明细：请输入物品名称`));
                         return false;
                     }
                     if (row.quantity === null || isNaN(Number(row.quantity)) || Number(row.quantity) <= 0) {
-                        this.$message.error(`第${i + 1}行明细：请输入有效的个数`);
+                        this.$message.error(msgcon(`第${i + 1}行明细：请输入有效的个数`));
                         return false;
                     }
                     if (!row.unit) {
-                        this.$message.error(`第${i + 1}行明细：请输入有效的单位`);
+                        this.$message.error(msgcon(`第${i + 1}行明细：请输入有效的单位`));
                         return false;
                     }
                     if (row.price === null || isNaN(Number(row.price)) || Number(row.price) <= 0) {
-                        this.$message.error(`第${i + 1}行明细：请输入有效的单价`);
+                        this.$message.error(msgcon(`第${i + 1}行明细：请输入有效的单价`));
                         return false;
                     }
                 }
@@ -176,7 +180,7 @@ export default {
 
             const cid = this.formdata.category;
             if (!cid) {
-                this.$message.error("请选择有效的分类");
+                this.$message.error(msgcon("请选择有效的分类"));
                 return;
             }
 
@@ -245,6 +249,43 @@ export default {
                 row.total = (quantity * price).toFixed(4);
             }
         },
+        copyDetailsJson() {
+            const toStr = (v) => (v === null || v === undefined ? "" : v);
+            const list = this.detailRows.map((row) => ({
+                name: toStr(row.name),
+                quantity: toStr(row.quantity),
+                price: toStr(row.price),
+                total: toStr(row.total),
+                unit: toStr(row.unit),
+            }));
+
+            const jsonStr = JSON.stringify(list);
+
+            const doFallback = () => {
+                const textarea = document.createElement("textarea");
+                textarea.value = jsonStr;
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand("copy");
+                    this.$message.success(msgcon("明细已复制到剪贴板"));
+                } catch {
+                    this.$message.error(msgcon("复制失败"));
+                }
+                document.body.removeChild(textarea);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard
+                    .writeText(jsonStr)
+                    .then(() => this.$message.success(msgcon("明细已复制到剪贴板")))
+                    .catch(doFallback);
+            } else {
+                doFallback();
+            }
+        },
     },
 };
 </script>
@@ -273,5 +314,11 @@ export default {
     font-weight: bold;
     color: #1890ff;
     border-top: 1px solid #e8e8e8;
+}
+.copy-btn {
+    color: #909399;
+}
+.copy-btn:hover {
+    color: #606266;
 }
 </style>
