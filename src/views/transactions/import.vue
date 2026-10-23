@@ -15,7 +15,7 @@
             <template #tip>
                 <div class="el-upload__tip">
                     仅支持 .csv 格式，第一行作为字段名（表头）<br />
-                    必需列：<b>cid, occ_time, amount, remark</b>；可选列：<b>detail</b>（JSON 字符串）
+                    必需列：<b>cid, occ_time, amount, remark</b>；可选列：<b>detail</b>（JSON 字符串，无明细请留空）
                 </div>
             </template>
         </el-upload>
@@ -92,16 +92,27 @@ import { msg } from "../../utils/message.ts";
 
 const MAX_CONCURRENCY = 10;
 const LEAVE_TIP = "导入正在进行中，离开页面可能导致数据不完整，确定要离开吗？";
+
+// Detail example (real JSON string, not placeholder text).
+// Second row leaves detail empty to demonstrate "no detail items".
 const TEMPLATE_ROWS = [
     ["cid", "occ_time", "amount", "remark", "detail"],
-    ["1002", "2025-09-24 20:15:42", "-333.12", "示例备注（支出金额为负数）（cid为分类id，在分类管理中查询）", "可选"],
-    ["5006", "2025-09-24 20:15:42", "100", "示例备注（收入金额为正数）"],
+    [
+        "1002",
+        "2025-09-24 20:15:42",
+        "-333.12",
+        "示例备注（支出金额为负数）（cid为分类id，在分类管理中查询）",
+        '[{"name":"鸡蛋","quantity":1,"price":21,"total":21,"unit":"盘"}]',
+    ],
+    ["5006", "2025-09-24 20:15:42", "100", "示例备注（收入金额为正数）", ""],
 ];
+
 const TABLE_COLUMNS = [
-    { prop: "cid", label: "cid", width: 100 },
-    { prop: "occ_time", label: "occ_time", minWidth: 170 },
-    { prop: "amount", label: "amount", width: 140 },
-    { prop: "remark", label: "remark", minWidth: 140 },
+    { prop: "cid", label: "cid", width: 70 },
+    { prop: "occ_time", label: "occ_time", minWidth: 150 },
+    { prop: "amount", label: "amount", width: 90 },
+    { prop: "remark", label: "remark", minWidth: 110 },
+    { prop: "detail", label: "明细", minWidth: 200 },
 ];
 
 const emptyProgress = () => ({ total: 0, done: 0, success: 0, fail: 0 });
@@ -112,6 +123,21 @@ const formatDuration = (ms) => {
     if (sec < 60) return `${sec.toFixed(1)}s`;
     return `${Math.floor(sec / 60)}m${(sec % 60).toFixed(0).padStart(2, "0")}s`;
 };
+
+// Check whether a detail field "has a value": non-empty string / valid number
+const isBlank = (v) => v === undefined || v === null || String(v).trim() === "";
+const isNumberLike = (v) => !isBlank(v) && !isNaN(Number(v));
+
+// Fix common issues caused by copy-paste from Word/WPS/WeChat before JSON.parse:
+// smart quotes, zero-width chars, non-breaking spaces.
+const normalizeDetailText = (raw) =>
+    String(raw)
+        .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
+        .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+        .replace(/[\u200B-\u200D\uFEFF]/g, "")
+        .replace(/\u00A0/g, " ")
+        .replace(/\uFF02/g, '"')
+        .replace(/\uFF07/g, "'");
 
 export default {
     name: "ImportBillIndex",
@@ -306,8 +332,9 @@ export default {
             return d.format("YYYY-MM-DDTHH:mm:ss+0800");
         },
 
-        // Build one transaction payload from a CSV row
-        buildTransaction(row) {
+        // Build one transaction payload from a CSV row.
+        // Throws when detail is malformed or has blank fields (message includes rowNo).
+        buildTransaction(row, rowNo) {
             const tx = {
                 cid: row.cid !== "" ? Number(row.cid) : undefined,
                 occ_time: this.formatOccTime(row.occ_time),
@@ -318,18 +345,42 @@ export default {
 
             const rawDetail = row.detail;
             if (rawDetail && String(rawDetail).trim() !== "") {
+                let detail;
                 try {
-                    const detail = typeof rawDetail === "string" ? JSON.parse(rawDetail) : rawDetail;
-                    if (Array.isArray(detail) && detail.length) {
-                        tx.detail = detail.map((d) => ({
-                            quantity: Number(d.quantity) || 0,
-                            price: Number(d.price) || 0,
-                            total: Number(d.total) || 0,
-                            unit: d.unit || "",
-                        }));
+                    detail = JSON.parse(normalizeDetailText(rawDetail));
+                } catch {
+                    throw new Error(`第 ${rowNo} 行 detail 不是合法的 JSON（如无明细请留空，或参考模板格式）`);
+                }
+                if (!Array.isArray(detail) || !detail.length) {
+                    throw new Error(`第 ${rowNo} 行 detail 必须是非空数组（无明细请留空）`);
+                }
+
+                const detailErrors = [];
+                tx.detail = detail.map((d, idx) => {
+                    const itemNo = idx + 1;
+                    const miss = [];
+                    if (isBlank(d.name)) miss.push("name");
+                    if (!isNumberLike(d.quantity)) miss.push("quantity");
+                    if (!isNumberLike(d.price)) miss.push("price");
+                    if (!isNumberLike(d.total)) miss.push("total");
+                    if (isBlank(d.unit)) miss.push("unit");
+                    if (miss.length) {
+                        detailErrors.push(`明细${itemNo} 缺少/无效字段：${miss.join("、")}`);
                     }
-                } catch (e) {
-                    console.warn("detail 解析失败，已忽略：", rawDetail, e);
+
+                    // 保留原始字段（含 name 等），仅对数值字段做类型转换
+                    return {
+                        ...d,
+                        name: String(d.name ?? "").trim(),
+                        quantity: Number(d.quantity),
+                        price: Number(d.price),
+                        total: Number(d.total),
+                        unit: String(d.unit ?? "").trim(),
+                    };
+                });
+
+                if (detailErrors.length) {
+                    throw new Error(`第 ${rowNo} 行 ${detailErrors.join("；")}`);
                 }
             }
 
@@ -344,8 +395,16 @@ export default {
             // 1. Build & validate
             const transactions = [];
             for (let i = 0; i < this.parsedData.length; i++) {
-                const tx = this.buildTransaction(this.parsedData[i]);
-                const rowNo = i + 2;
+                const rowNo = i + 1;
+                let tx;
+                try {
+                    tx = this.buildTransaction(this.parsedData[i], rowNo);
+                } catch (e) {
+                    this.errorMsg = e.message;
+                    msg.error(e.message);
+                    return;
+                }
+
                 let err = "";
                 if (isNaN(tx.cid)) err = `第 ${rowNo} 行 cid 无效`;
                 else if (!tx.occ_time) err = `第 ${rowNo} 行 occ_time 无效`;
@@ -380,7 +439,7 @@ export default {
             const worker = async () => {
                 while (cursor < total) {
                     const i = cursor++;
-                    const rowNo = i + 2;
+                    const rowNo = i + 1;
                     try {
                         const res = await AddTransactions(transactions[i]);
                         if (res && res.code !== undefined && res.code !== 0 && res.code !== 200) {
