@@ -2,22 +2,19 @@
     <div class="chart-card">
         <div class="chart-header">
             <span class="chart-title">每日{{ cfg.label }}趋势</span>
-            <span class="chart-total" :style="{ color: cfg.color }"> 合计 {{ currentTotal }} 元 </span>
+            <span class="chart-total" :style="{ color: cfg.color }">合计 {{ currentTotal }} 元</span>
         </div>
         <div class="chart-body" ref="chart"></div>
     </div>
 </template>
-
 <script>
 import { GetChartDay } from "../../api/basic.js";
 import { withDelay } from "../../utils/common.js";
 import * as echarts from "echarts";
-
 const TYPE_OPTIONS = [
     { value: "expense", label: "支出", color: "#f56c6c" },
     { value: "income", label: "收入", color: "#36cbcb" },
 ];
-
 export default {
     name: "DayChart",
     props: {
@@ -40,6 +37,9 @@ export default {
             const data = this.type === "income" ? this.chartData.incomeData : this.chartData.expenseData;
             return data.reduce((s, v) => s + Number(v || 0), 0).toFixed(2);
         },
+        activeRawData() {
+            return this.type === "income" ? this.chartData.incomeData : this.chartData.expenseData;
+        },
     },
     mounted() {
         this.myChart = echarts.init(this.$refs.chart);
@@ -53,14 +53,12 @@ export default {
         this.myChart = null;
     },
     watch: {
-        // 月份变化：重新请求
         queryParams: {
             handler(n, o) {
                 if (o !== undefined) this.getBillChartData();
             },
             deep: true,
         },
-        // 收支类型变化：数据已取回，只重渲染
         type() {
             this.renderChart();
         },
@@ -69,6 +67,36 @@ export default {
         handleResize() {
             clearTimeout(this.resizeTimer);
             this.resizeTimer = setTimeout(() => this.myChart?.resize(), 100);
+        },
+        getQuartile(sorted, pos) {
+            const idx = (sorted.length - 1) * pos;
+            const f = Math.floor(idx);
+            const c = Math.ceil(idx);
+            if (f === c) return sorted[idx];
+            return sorted[f] + (sorted[c] - sorted[f]) * (idx - f);
+        },
+        // IQR 计算断轴区间：只要最大值超出上界就断
+        calcIQR(dataArr) {
+            const statData = dataArr.filter((v) => v != null && !isNaN(v) && Number(v) > 0).map(Number);
+            let breaks = [];
+            const MIN_STAT_COUNT = 4;
+            const K_FACTOR = 2.0;
+            if (statData.length >= MIN_STAT_COUNT) {
+                const arr = [...statData].sort((a, b) => a - b);
+                const Q1 = this.getQuartile(arr, 0.25);
+                const Q3 = this.getQuartile(arr, 0.75);
+                const IQR = Q3 - Q1;
+                const upperBound = Q3 + K_FACTOR * IQR;
+                const maxVal = arr[arr.length - 1];
+                if (IQR > 0 && maxVal > upperBound) {
+                    const breakStart = Number(upperBound.toFixed(2));
+                    const breakEnd = Number((maxVal * 0.95).toFixed(2));
+                    if (breakEnd > breakStart) {
+                        breaks.push({ start: breakStart, end: breakEnd, gap: "12%" });
+                    }
+                }
+            }
+            return { breaks };
         },
         async getBillChartData() {
             if (!this.queryParams || this.loadingFlag) return;
@@ -100,49 +128,56 @@ export default {
         },
         renderChart() {
             if (!this.myChart) return;
-            const { xData, incomeData, expenseData } = this.chartData;
-            const data = this.type === "income" ? incomeData : expenseData;
+            const { xData } = this.chartData;
+            const rawData = this.activeRawData;
+            if (!xData.length) return;
 
-            this.myChart.setOption(
-                {
-                    grid: { left: 44, right: 16, top: 16, bottom: 28 },
-                    tooltip: {
-                        trigger: "axis",
-                        confine: true,
-                        formatter: (params) => {
-                            const p = params[0];
-                            if (!p) return "";
-                            return `${p.axisValue}<br/>${p.seriesName}：${Number(p.value || 0).toFixed(2)}元`;
-                        },
+            const { breaks } = this.calcIQR(rawData);
+
+            const option = {
+                grid: { left: 44, right: 24, top: 16, bottom: 28 },
+                tooltip: {
+                    trigger: "axis",
+                    confine: true,
+                    formatter: (params) => {
+                        const p = params[0];
+                        if (!p) return "";
+                        const realVal = rawData[p.dataIndex];
+                        return `${p.axisValue}<br />${this.cfg.label}：${Number(realVal || 0).toFixed(2)}元`;
                     },
-                    xAxis: {
-                        type: "category",
-                        data: xData,
-                        boundaryGap: false,
-                        axisLabel: { interval: "auto", fontSize: 10, color: "#909399" },
-                        axisLine: { lineStyle: { color: "#e4e7ed" } },
-                    },
-                    yAxis: {
-                        type: "value",
-                        axisLabel: { fontSize: 10, color: "#909399" },
-                        splitLine: { lineStyle: { color: "#f0f0f0" } },
-                    },
-                    series: [
-                        {
-                            name: this.cfg.label,
-                            type: "line",
-                            smooth: true,
-                            data,
-                            symbol: "circle",
-                            symbolSize: 4,
-                            itemStyle: { color: this.cfg.color },
-                            lineStyle: { width: 2 },
-                            areaStyle: { opacity: 0.12, color: this.cfg.color },
-                        },
-                    ],
                 },
-                true,
-            );
+                xAxis: {
+                    type: "category",
+                    data: xData,
+                    boundaryGap: false,
+                    axisLabel: { interval: "auto", fontSize: 10, color: "#909399" },
+                    axisLine: { lineStyle: { color: "#e4e7ed" } },
+                },
+                yAxis: {
+                    type: "value",
+                    min: 0,
+                    breaks,
+                    breakLine: {
+                        lineStyle: { color: "#aaaaaa", width: 1.4, type: "solid" },
+                    },
+                    axisLabel: { fontSize: 10, color: "#909399" },
+                    splitLine: { lineStyle: { color: "#f0f0f0" } },
+                },
+                series: [
+                    {
+                        name: this.cfg.label,
+                        type: "line",
+                        smooth: true,
+                        data: rawData,
+                        symbol: "circle",
+                        symbolSize: 4,
+                        itemStyle: { color: this.cfg.color },
+                        lineStyle: { width: 2 },
+                        areaStyle: { opacity: 0.12, color: this.cfg.color },
+                    },
+                ],
+            };
+            this.myChart.setOption(option, true);
         },
         refreshChart() {
             this.getBillChartData();
@@ -150,7 +185,6 @@ export default {
     },
 };
 </script>
-
 <style scoped>
 .chart-card {
     width: 100%;
