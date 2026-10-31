@@ -3,24 +3,23 @@
         <!-- 工具栏 -->
         <div class="panel toolbar">
             <div class="toolbar__stats">
-                <span class="stat">
-                    <span class="stat__label">本期收入：</span>
-                    <span class="stat__value stat__value--income">{{ incomeTotal }}</span>
-                </span>
-                <span class="stat">
-                    <span class="stat__label">本期支出：</span>
-                    <span class="stat__value stat__value--expense">{{ expendTotal }}</span>
-                </span>
+                <div class="stat">
+                    <span class="stat__label">本期收入</span>
+                    <span class="stat__value stat__value--income">{{ formatAmount(incomeTotal) }}</span>
+                    <span class="stat__unit">元</span>
+                </div>
+
+                <span class="stat__divider"></span>
+
+                <div class="stat">
+                    <span class="stat__label">本期支出</span>
+                    <span class="stat__value stat__value--expense">{{ formatAmount(expendTotal) }}</span>
+                    <span class="stat__unit">元</span>
+                </div>
             </div>
 
-            <div class="toolbar__actions">
-                <el-button-group v-if="mode !== 'custom'">
-                    <el-button :icon="ArrowLeft" @click="handleShift(-1)" />
-                    <el-button :icon="ArrowRight" @click="handleShift(1)" />
-                </el-button-group>
-
-                <!-- 固定宽度容器，切换模式时不抖动 -->
-                <div class="picker-wrap">
+            <el-space :size="20">
+                <div class="picker-wrap" :class="{ 'picker-wrap--wide': mode === 'custom' }">
                     <el-date-picker
                         v-if="mode === 'year'"
                         v-model="month"
@@ -28,7 +27,6 @@
                         placeholder="选择年份"
                         format="YYYY"
                         value-format="YYYY"
-                        class="picker"
                         @change="handleMonthChange" />
                     <el-date-picker
                         v-if="mode === 'month'"
@@ -37,7 +35,6 @@
                         placeholder="选择月份"
                         format="YYYY-MM"
                         value-format="YYYY-MM"
-                        class="picker"
                         @change="handleMonthChange" />
                     <el-date-picker
                         v-if="mode === 'custom'"
@@ -47,18 +44,21 @@
                         end-placeholder="结束日期"
                         format="YYYY-MM-DD"
                         value-format="YYYY-MM-DD"
-                        class="picker"
                         @change="handleMonthChange" />
                 </div>
+                <el-button-group v-if="mode !== 'custom'">
+                    <el-button :icon="ArrowLeft" @click="handleShift(-1)" />
+                    <el-button :icon="ArrowRight" @click="handleShift(1)" />
+                </el-button-group>
 
-                <el-select v-model="mode" class="mode-select" placeholder="报表类型" @change="handleModeChange">
-                    <el-option label="年报" value="year" />
-                    <el-option label="月报" value="month" />
-                    <el-option label="自定义" value="custom" />
-                </el-select>
+                <el-radio-group v-model="mode" @change="handleModeChange">
+                    <el-radio-button label="year">年报</el-radio-button>
+                    <el-radio-button label="month">月报</el-radio-button>
+                    <el-radio-button label="custom">自定义</el-radio-button>
+                </el-radio-group>
 
                 <el-button type="primary" :icon="Refresh" :loading="loading" @click="onRefresh">刷新</el-button>
-            </div>
+            </el-space>
         </div>
 
         <!-- 图表区：2 × 2 网格 -->
@@ -99,7 +99,7 @@ export default {
     data() {
         return {
             loading: false,
-            mode: "month",
+            mode: "year",
             month: "",
             custom: [],
             chartParams: null,
@@ -113,6 +113,16 @@ export default {
         this.handleMonthChange();
     },
     methods: {
+        // 金额千分位 + 固定两位小数
+        formatAmount(val) {
+            const n = Number(val);
+            if (!isFinite(n)) return "0.00";
+            return n.toLocaleString("zh-CN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        },
+
         getRangeParams() {
             const { mode, month, custom } = this;
             if (mode === "custom") {
@@ -206,7 +216,7 @@ export default {
 </script>
 
 <style scoped lang="less">
-/* ---------- 页面容器：统一内边距与纵向间距 ---------- */
+/* ---------- 页面容器 ---------- */
 .page {
     display: flex;
     flex-direction: column;
@@ -215,7 +225,7 @@ export default {
     box-sizing: border-box;
 }
 
-/* ---------- 统一卡片外观（工具栏 + 图表共用） ---------- */
+/* ---------- 统一卡片 ---------- */
 .panel {
     background: #fff;
     border-radius: 8px;
@@ -234,61 +244,67 @@ export default {
     padding: 16px 20px;
 }
 
+/* ---------- 收支统计 ---------- */
 .toolbar__stats {
     display: flex;
     align-items: center;
-    gap: 24px;
     flex-wrap: wrap;
+    gap: 0;
 }
 
 .stat {
     display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
+    align-items: center;
+    gap: 10px;
     white-space: nowrap;
 }
 
 .stat__label {
-    color: #606266;
-    font-size: 14px;
+    color: #909399;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
 }
 
 .stat__value {
-    min-width: 80px;
-    font-weight: 600;
-    font-size: 16px;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.3px;
     font-variant-numeric: tabular-nums;
+    font-family:
+        "DIN Alternate",
+        "SF Pro Display",
+        -apple-system,
+        "Segoe UI",
+        "Helvetica Neue",
+        sans-serif;
 
     &--income {
-        color: #36cbcb;
+        color: #13a3a3;
     }
 
     &--expense {
-        color: #f56c6c;
+        color: #e54d4d;
     }
 }
 
-.toolbar__actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+.stat__unit {
+    color: #c0c4cc;
+    font-size: 12px;
+    margin-left: -6px;
+    align-self: flex-end;
+    padding-bottom: 2px;
 }
 
-/* 固定宽度包一层，三种 picker 切换时布局不抖动 */
-.picker-wrap {
-    width: 280px;
+.stat__divider {
+    width: 1px;
+    height: 22px;
+    background: #ebeef5;
+    margin: 0 24px;
+    flex-shrink: 0;
 }
 
-.picker {
-    width: 100%;
-}
-
-.mode-select {
-    width: 140px;
-}
-
-/* ---------- 图表网格 ---------- */
 .chart-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -297,75 +313,14 @@ export default {
 }
 
 .chart-card {
-    height: 100%;
     padding: 16px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
 
-    /* 让内部图表组件撑满卡片 */
     > * {
         flex: 1 1 auto;
         min-height: 0;
-    }
-}
-
-/* ---------- 响应式 ---------- */
-
-/* 中等屏：缩小高度、收窄控件 */
-@media (max-width: 1200px) {
-    .chart-grid {
-        grid-auto-rows: 360px;
-    }
-
-    .picker-wrap {
-        width: 240px;
-    }
-}
-
-/* 平板 / 手机横屏：单列 + 工具栏换行 */
-@media (max-width: 900px) {
-    .page {
-        padding: 8px;
-    }
-
-    .toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .toolbar__actions {
-        width: 100%;
-    }
-
-    .toolbar__actions > * {
-        flex: 1 1 auto;
-    }
-
-    .picker-wrap,
-    .mode-select {
-        width: 100%;
-        min-width: 0;
-    }
-
-    .chart-grid {
-        grid-template-columns: minmax(0, 1fr);
-        grid-auto-rows: 320px;
-    }
-}
-
-@media (max-width: 600px) {
-    .chart-grid {
-        grid-auto-rows: 280px;
-    }
-
-    .toolbar__stats {
-        gap: 12px;
-    }
-
-    .stat__value {
-        min-width: 64px;
-        font-size: 15px;
     }
 }
 </style>

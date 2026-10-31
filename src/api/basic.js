@@ -31,6 +31,8 @@ export const GetCycleSummary = (params) => ajax(`/api/ledger/v1/stat/cycle-summa
 export const GetChartDay = (params) => ajax(`/api/ledger/v1/stat/chart/day`, "GET", params, null);
 export const GetChartCategory = (params) => ajax(`/api/ledger/v1/stat/category`, "GET", params, null);
 export const GetChartExpenseRank = (params) => ajax(`/api/ledger/v1/stat/expense-rank`, "GET", params, null);
+export const GetChartMonth = (params) => ajax(`/api/ledger/v1/stat/chart/month`, "GET", params, null);
+export const GetChartYear = (params) => ajax(`/api/ledger/v1/stat/chart/year`, "GET", params, null);
 
 // 分类管理
 //    GET /v1/category                    查询记账单

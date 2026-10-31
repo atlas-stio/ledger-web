@@ -9,7 +9,7 @@
                     renderChart();
                 "
                 :style="modeStyle('normalBreak')">
-                自动断轴
+                普通坐标轴
             </button>
             <button
                 @click="
@@ -24,9 +24,22 @@
     </div>
 </template>
 <script>
-import { GetChartDay } from "../../../api/basic.js";
+import { GetChartDay, GetChartMonth, GetChartYear } from "../../../api/basic.js";
 import { withDelay } from "../../../utils/common.js";
 import * as echarts from "echarts";
+
+// 按 from/to 跨度自动选接口：
+//   ≤62 天     → chart/day   （X 轴 MM-DD）
+//   ≤366 天    → chart/month （X 轴 YYYY-MM）
+//   >366 天    → chart/year  （X 轴 YYYY）
+function pickTrendApi(from, to) {
+    if (!from || !to) return { api: GetChartDay, word: "每日", slice: 5 };
+    const days = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+    if (days <= 62) return { api: GetChartDay, word: "每日", slice: 5 };
+    if (days <= 366) return { api: GetChartMonth, word: "每月", slice: 0 };
+    return { api: GetChartYear, word: "每年", slice: 0 };
+}
+
 export default {
     name: "DayExpenseChart",
     props: {
@@ -41,6 +54,7 @@ export default {
             currentMode: "normalBreak",
             cacheXData: [],
             cacheExpenseRaw: [],
+            cacheTitleWord: "每日", // 标题文案（每日 / 每月 / 每年）
         };
     },
     mounted() {
@@ -129,7 +143,13 @@ export default {
             const xData = this.cacheXData;
             const expenseRaw = this.cacheExpenseRaw;
             if (!xData.length) return;
+
             const { breaks, breakTipText } = this.calcIQR(expenseRaw);
+            const titleWord = this.cacheTitleWord || "每日";
+            // 12 个点全显；30 个点左右抽稀；更多时约 12 个刻度
+            const labelInterval = xData.length <= 15 ? 0 : Math.floor(xData.length / 12);
+            const rotate = 30;
+
             let option = null;
 
             if (this.currentMode === "normalBreak") {
@@ -142,7 +162,7 @@ export default {
                         bottom: 40,
                     },
                     title: {
-                        text: "月度每日支出统计【自动断轴】",
+                        text: `${titleWord}支出统计`,
                         left: "center",
                         subtext: breakTipText,
                         subtextStyle: { fontSize: 11, color: "#f56c6c" },
@@ -153,7 +173,7 @@ export default {
                         formatter(params) {
                             let tip = params[0].axisValue;
                             params.forEach((p) => {
-                                tip += `<br />${p.seriesName}：${p.value.toFixed(2)}元`;
+                                tip += `<br />${p.seriesName}：${Number(p.value).toFixed(2)}元`;
                             });
                             return tip;
                         },
@@ -161,7 +181,7 @@ export default {
                     xAxis: {
                         type: "category",
                         data: xData,
-                        axisLabel: { interval: 2, rotate: 30 },
+                        axisLabel: { interval: labelInterval, rotate },
                         boundaryGap: false,
                     },
                     yAxis: {
@@ -187,7 +207,7 @@ export default {
                     ],
                 };
             } else if (this.currentMode === "logAxis") {
-                // 模式2：对数坐标轴，0转为'-'，默认断开空值
+                // 模式2：对数坐标轴，0 转为 '-' 断开
                 const logData = expenseRaw.map((v) => (v > 0 ? v : "-"));
                 option = {
                     grid: {
@@ -197,7 +217,7 @@ export default {
                         bottom: 40,
                     },
                     title: {
-                        text: "月度每日支出统计【对数坐标轴】",
+                        text: `${titleWord}支出统计【对数坐标轴】`,
                         left: "center",
                         textStyle: { fontSize: 16 },
                     },
@@ -214,7 +234,7 @@ export default {
                     xAxis: {
                         type: "category",
                         data: xData,
-                        axisLabel: { interval: 2, rotate: 30 },
+                        axisLabel: { interval: labelInterval, rotate },
                         boundaryGap: false,
                     },
                     yAxis: {
@@ -247,12 +267,16 @@ export default {
                     textColor: "#666",
                     maskColor: "rgba(255,255,255,0.7)",
                 });
-                const res = await withDelay(() => GetChartDay(this.queryParams));
+
+                const { api, word, slice } = pickTrendApi(this.queryParams.from, this.queryParams.to);
+                this.cacheTitleWord = word;
+
+                const res = await withDelay(() => api(this.queryParams));
                 const list = res.payload || [];
                 const xData = [];
                 const expenseData = [];
                 list.forEach((item) => {
-                    xData.push(item.day.slice(5));
+                    xData.push(slice ? item.day.slice(slice) : item.day);
                     expenseData.push(Number(item.expense));
                 });
                 this.cacheXData = xData;
@@ -261,7 +285,7 @@ export default {
                 this.myChart?.hideLoading();
             } catch (err) {
                 this.myChart?.hideLoading();
-                console.error("获取每日支出图表失败：", err);
+                console.error("获取支出趋势图表失败：", err);
             } finally {
                 this.loadingFlag = false;
             }
