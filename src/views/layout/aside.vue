@@ -8,8 +8,12 @@
                         <el-icon><DataLine /></el-icon>
                         <template #title><span>数据总览</span></template>
                     </el-menu-item>
+                    <el-menu-item index="/calendar" @click="OnSwitchRoutes('/calendar')">
+                        <el-icon><Calendar /></el-icon>
+                        <template #title><span>日历视图</span></template>
+                    </el-menu-item>
                     <el-menu-item index="/transactions" @click="OnSwitchRoutes('/transactions')">
-                        <el-icon><House /></el-icon>
+                        <el-icon><Tickets /></el-icon>
                         <template #title><span>记账管理</span></template>
                     </el-menu-item>
                     <el-menu-item index="/category" @click="OnSwitchRoutes('/category')">

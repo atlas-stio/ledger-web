@@ -17,8 +17,7 @@
                     <span class="stat__unit">元</span>
                 </div>
             </div>
-
-            <el-space :size="20">
+            <el-space>
                 <div class="picker-wrap" :class="{ 'picker-wrap--wide': mode === 'custom' }">
                     <el-date-picker
                         v-if="mode === 'year'"
