@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { msgcon } from "../../utils/message.js";
+import { msg } from "../../utils/message.ts";
 import { GetStatistic } from "../../api/basic.js";
 
 export default {
@@ -81,15 +81,13 @@ export default {
                     this.income = res.payload.income || "0.00";
                     this.expense = res.payload.expense || "0.00";
                 }
-            } catch (err) {
-                console.error("获取统计失败：", err);
-                msgcon.error("获取收支统计失败");
+            } catch {
+                msg.error("获取收支统计失败");
             }
         },
     },
 };
 </script>
-
 <style scoped>
 .card-box {
     width: 100%;

@@ -15,10 +15,14 @@
 <script>
 import { GetChartExpenseRank } from "../../../api/basic.js";
 import { withDelay } from "../../../utils/common.js";
+import { setRouteQuery, getRouteQuery } from "../../../utils/routeQuery";
 import * as echarts from "echarts";
 
 const EXPENSE_COLOR = "#5B8FF9";
 const INCOME_COLOR = "#5AD8A6";
+
+const QUERY_DT = "dt";
+const VALID_DT = [1, 2];
 
 export default {
     name: "RankChart",
@@ -31,15 +35,19 @@ export default {
             resizeTimer: null,
             loadingFlag: false,
             currentDt: 2, // 1 income / 2 expense
+            isReady: false,
         };
     },
     mounted() {
-        if (this.queryParams?.dt) {
-            this.currentDt = Number(this.queryParams.dt);
-        }
+        this.currentDt = this.resolveInitialDt();
+
         this.myChart = echarts.init(this.$refs.chart);
         this.getRankChartData();
         window.addEventListener("resize", this.handleResize);
+
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
     },
     beforeUnmount() {
         clearTimeout(this.resizeTimer);
@@ -51,13 +59,33 @@ export default {
         queryParams: {
             handler(newVal, oldVal) {
                 if (oldVal === undefined) return;
-                if (newVal?.dt) this.currentDt = Number(newVal.dt);
+                if (newVal?.dt) {
+                    const dt = Number(newVal.dt);
+                    if (VALID_DT.includes(dt) && this.currentDt !== dt) {
+                        this.currentDt = dt;
+                    }
+                }
                 this.getRankChartData();
             },
             deep: true,
         },
     },
     methods: {
+        resolveInitialDt() {
+            if (this.queryParams?.dt) {
+                const qdt = Number(this.queryParams.dt);
+                if (VALID_DT.includes(qdt)) return qdt;
+            }
+            const saved = getRouteQuery(this.$route, [QUERY_DT], { [QUERY_DT]: 2 });
+            const dt = Number(saved[QUERY_DT]);
+            return VALID_DT.includes(dt) ? dt : 2;
+        },
+
+        syncToUrl() {
+            if (!this.isReady) return;
+            setRouteQuery(this.$router, this.$route, { [QUERY_DT]: this.currentDt });
+        },
+
         handleResize() {
             clearTimeout(this.resizeTimer);
             this.resizeTimer = setTimeout(() => this.myChart?.resize(), 100);
@@ -66,6 +94,7 @@ export default {
         handleDtChange(dt) {
             if (this.currentDt === dt) return;
             this.currentDt = dt;
+            this.syncToUrl();
             this.getRankChartData();
         },
 

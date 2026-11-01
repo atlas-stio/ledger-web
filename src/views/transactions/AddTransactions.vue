@@ -75,7 +75,7 @@ import { Plus, Remove, DocumentCopy } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import TreeCategorySelect from "./TreeCategorySelect.vue";
 import { AddTransactions } from "../../api/basic.js";
-import { msgcon } from "../../utils/message.js";
+import { msg } from "../../utils/message.ts";
 
 export default {
     name: "AddTransactionsIndex",
@@ -87,22 +87,12 @@ export default {
         },
     },
     setup() {
-        return {
-            Plus,
-            Remove,
-            DocumentCopy,
-        };
+        return { Plus, Remove, DocumentCopy };
     },
     data() {
         return {
             dialogVisible: false,
-            formdata: {
-                direction: 2,
-                occ_time: "",
-                amount: "",
-                remark: "",
-                category: null,
-            },
+            formdata: { direction: 2, occ_time: "", amount: "", remark: "", category: null },
             detailRows: [],
             formRules: {
                 occ_time: [{ required: true, type: "string", message: "请选择时间", trigger: ["blur", "change"] }],
@@ -116,9 +106,7 @@ export default {
     },
     computed: {
         totalAmount() {
-            return this.detailRows.reduce((sum, row) => {
-                return sum + (Number(row.total) || 0);
-            }, 0);
+            return this.detailRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
         },
     },
     methods: {
@@ -129,25 +117,18 @@ export default {
             this.detailRows = [];
             this.onSetNowTime();
             this.dialogVisible = true;
-            this.$nextTick(() => {
-                if (this.$refs["form"]) {
-                    this.$refs["form"].resetFields();
-                }
-            });
+            this.$nextTick(() => this.$refs["form"]?.resetFields());
         },
         onCloseDialog() {
             this.dialogVisible = false;
         },
         async validateForm() {
             const mainFormValid = await new Promise((resolve) => {
-                this.$refs["form"].validate((valid) => {
-                    resolve(valid);
-                });
+                this.$refs["form"].validate((valid) => resolve(valid));
             });
 
-            // 表单校验通过后，二次校验分类对象
             if (mainFormValid && !this.formdata.category) {
-                this.$message.error(msgcon("请选择类别"));
+                msg.error("请选择类别");
                 return false;
             }
 
@@ -155,19 +136,19 @@ export default {
                 for (let i = 0; i < this.detailRows.length; i++) {
                     const row = this.detailRows[i];
                     if (!row.name) {
-                        this.$message.error(msgcon(`第${i + 1}行明细：请输入物品名称`));
+                        msg.error(`第${i + 1}行明细：请输入物品名称`);
                         return false;
                     }
                     if (row.quantity === null || isNaN(Number(row.quantity)) || Number(row.quantity) <= 0) {
-                        this.$message.error(msgcon(`第${i + 1}行明细：请输入有效的个数`));
+                        msg.error(`第${i + 1}行明细：请输入有效的个数`);
                         return false;
                     }
                     if (!row.unit) {
-                        this.$message.error(msgcon(`第${i + 1}行明细：请输入有效的单位`));
+                        msg.error(`第${i + 1}行明细：请输入有效的单位`);
                         return false;
                     }
                     if (row.price === null || isNaN(Number(row.price)) || Number(row.price) <= 0) {
-                        this.$message.error(msgcon(`第${i + 1}行明细：请输入有效的单价`));
+                        msg.error(`第${i + 1}行明细：请输入有效的单价`);
                         return false;
                     }
                 }
@@ -180,14 +161,12 @@ export default {
 
             const cid = this.formdata.category;
             if (!cid) {
-                this.$message.error(msgcon("请选择有效的分类"));
+                msg.error("请选择有效的分类");
                 return;
             }
 
             let amount = Number(this.formdata.amount);
-            if (this.formdata.direction === 2) {
-                amount = amount * -1;
-            }
+            if (this.formdata.direction === 2) amount = amount * -1;
 
             const formattedDetails = this.detailRows.map((row) => ({
                 name: row.name,
@@ -198,16 +177,16 @@ export default {
             }));
 
             const data = {
-                cid: cid,
+                cid,
                 occ_time: this.formdata.occ_time,
-                amount: amount,
+                amount,
                 remark: this.formdata.remark,
                 detail: formattedDetails,
             };
 
             AddTransactions(data)
                 .then(() => {
-                    this.$message.success(msgcon("添加成功"));
+                    msg.success("添加成功");
                     this.$globalBus.emit("onRefresh");
                     if (val === 1) {
                         this.formdata.amount = "";
@@ -221,8 +200,8 @@ export default {
                     }
                 })
                 .catch((err) => {
-                    let msg = err.data.metadata.message;
-                    this.$message.error(msgcon("添加失败 " + msg));
+                    const errMsg = err?.data?.metadata?.message || "未知错误";
+                    msg.error("添加失败 " + errMsg);
                 });
         },
         onSetNowTime() {
@@ -244,9 +223,7 @@ export default {
         calculateTotal(index) {
             const row = this.detailRows[index];
             if (row && row.quantity !== null && row.price !== null) {
-                const quantity = Number(row.quantity);
-                const price = Number(row.price);
-                row.total = (quantity * price).toFixed(4);
+                row.total = (Number(row.quantity) * Number(row.price)).toFixed(4);
             }
         },
         copyDetailsJson() {
@@ -270,9 +247,9 @@ export default {
                 textarea.select();
                 try {
                     document.execCommand("copy");
-                    this.$message.success(msgcon("明细已复制到剪贴板"));
+                    msg.success("明细已复制到剪贴板");
                 } catch {
-                    this.$message.error(msgcon("复制失败"));
+                    msg.error("复制失败");
                 }
                 document.body.removeChild(textarea);
             };
@@ -280,7 +257,7 @@ export default {
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard
                     .writeText(jsonStr)
-                    .then(() => this.$message.success(msgcon("明细已复制到剪贴板")))
+                    .then(() => msg.success("明细已复制到剪贴板"))
                     .catch(doFallback);
             } else {
                 doFallback();

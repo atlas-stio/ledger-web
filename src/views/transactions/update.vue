@@ -70,31 +70,19 @@ import { Plus, Remove } from "@element-plus/icons-vue";
 import dayjs from "dayjs";
 import TreeCategorySelect from "./TreeCategorySelect.vue";
 import { GetTranDetails, EditTransactions } from "../../api/basic.js";
-import { msgcon } from "../../utils/message.js";
+import { msg } from "../../utils/message.ts";
 import { withDelay } from "../../utils/common.js";
 
-const DEFAULT_TRAN_FORM = {
-    direction: 2,
-    occ_time: "",
-    amount: "",
-    category: null,
-    remark: "",
-};
+const DEFAULT_TRAN_FORM = { direction: 2, occ_time: "", amount: "", category: null, remark: "" };
 
 export default {
     name: "UpdateTransactions",
     components: { TreeCategorySelect },
     props: {
-        vdata: {
-            type: Object,
-            default: () => ({}),
-        },
+        vdata: { type: Object, default: () => ({}) },
     },
     setup() {
-        return {
-            Plus,
-            Remove,
-        };
+        return { Plus, Remove };
     },
     data() {
         return {
@@ -103,7 +91,7 @@ export default {
             formdata: { ...DEFAULT_TRAN_FORM },
             detailRows: [],
             tranId: null,
-            targetCidCache: null, // 缓存需要回显的分类id
+            targetCidCache: null,
             formRules: {
                 occ_time: [{ required: true, type: "string", message: "请选择时间", trigger: ["blur", "change"] }],
                 amount: [
@@ -116,9 +104,7 @@ export default {
     },
     computed: {
         totalAmount() {
-            return this.detailRows.reduce((sum, row) => {
-                return sum + (Number(row.total) || 0);
-            }, 0);
+            return this.detailRows.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
         },
     },
     methods: {
@@ -140,11 +126,7 @@ export default {
         },
         handleDialogClose() {
             this.loading = false;
-            this.$nextTick(() => {
-                if (this.$refs["form"]) {
-                    this.$refs["form"].clearValidate();
-                }
-            });
+            this.$nextTick(() => this.$refs["form"]?.clearValidate());
         },
         async GetDetails() {
             const res = await withDelay(() => GetTranDetails(this.tranId));
@@ -153,21 +135,16 @@ export default {
             const rawAmount = Number(payload.amount);
             this.formdata.direction = rawAmount >= 0 ? 1 : 2;
             this.formdata.amount = Math.abs(rawAmount).toString();
-
             this.formdata.occ_time = dayjs(payload.occ_time).format("YYYY-MM-DDTHH:mm:ssZZ");
             this.formdata.remark = payload.remark || "";
             this.detailRows = payload.detail ? [...payload.detail] : [];
 
-            // 缓存cid，**不直接赋值**，等组件加载完毕再赋值
             this.targetCidCache = payload.cid;
             this.formdata.category = null;
 
-            // 等待组件挂载+分类加载完成，执行回显
             this.$nextTick(async () => {
                 if (!this.$refs.treeCat) return;
-                // 等待组件内部分类请求完成
                 await this.$refs.treeCat.loadCategory();
-                // 赋值触发匹配
                 this.formdata.category = this.targetCidCache;
             });
         },
@@ -177,31 +154,29 @@ export default {
         },
         async validateForm() {
             const mainFormValid = await new Promise((resolve) => {
-                this.$refs["form"].validate((valid) => {
-                    resolve(valid);
-                });
+                this.$refs["form"].validate((valid) => resolve(valid));
             });
             if (mainFormValid && !this.formdata.category) {
-                this.$message.error("请选择类别");
+                msg.error("请选择类别");
                 return false;
             }
             if (this.detailRows.length > 0) {
                 for (let i = 0; i < this.detailRows.length; i++) {
                     const row = this.detailRows[i];
                     if (!row.name) {
-                        this.$message.error(`第${i + 1}行明细：请输入物品名称`);
+                        msg.error(`第${i + 1}行明细：请输入物品名称`);
                         return false;
                     }
                     if (row.quantity === null || isNaN(Number(row.quantity)) || Number(row.quantity) <= 0) {
-                        this.$message.error(`第${i + 1}行明细：请输入有效的个数`);
+                        msg.error(`第${i + 1}行明细：请输入有效的个数`);
                         return false;
                     }
                     if (!row.unit) {
-                        this.$message.error(`第${i + 1}行明细：请输入有效的单位`);
+                        msg.error(`第${i + 1}行明细：请输入有效的单位`);
                         return false;
                     }
                     if (row.price === null || isNaN(Number(row.price)) || Number(row.price) <= 0) {
-                        this.$message.error(`第${i + 1}行明细：请输入有效的单价`);
+                        msg.error(`第${i + 1}行明细：请输入有效的单价`);
                         return false;
                     }
                 }
@@ -212,16 +187,14 @@ export default {
             const valid = await this.validateForm();
             if (!valid) return;
 
-            if (!this.formdata.category || !this.formdata.category) {
-                this.$message.error(msgcon("请选择有效的分类"));
+            if (!this.formdata.category) {
+                msg.error("请选择有效的分类");
                 return;
             }
             const cid = this.formdata.category;
 
             let amount = Number(this.formdata.amount);
-            if (this.formdata.direction === 2) {
-                amount = amount * -1;
-            }
+            if (this.formdata.direction === 2) amount = amount * -1;
 
             const formattedDetails = this.detailRows.map((row) => ({
                 name: row.name,
@@ -232,22 +205,22 @@ export default {
             }));
 
             const data = {
-                cid: cid,
+                cid,
                 occ_time: this.formdata.occ_time,
-                amount: amount,
+                amount,
                 remark: this.formdata.remark,
                 detail: formattedDetails,
             };
 
             EditTransactions(this.tranId, data)
                 .then(() => {
-                    this.$message.success(msgcon("修改成功"));
+                    msg.success("修改成功");
                     this.$globalBus.emit("onRefresh");
                     this.dialogVisible = false;
                 })
                 .catch((err) => {
-                    let msg = err.data?.metadata?.message || err.message;
-                    this.$message.error(msgcon("修改失败 " + msg));
+                    const errMsg = err?.data?.metadata?.message || err?.message || "未知错误";
+                    msg.error("修改失败 " + errMsg);
                 });
         },
         addDetailRow() {
@@ -266,9 +239,7 @@ export default {
         calculateTotal(index) {
             const row = this.detailRows[index];
             if (row && row.quantity !== null && row.price !== null) {
-                const quantity = Number(row.quantity);
-                const price = Number(row.price);
-                row.total = (quantity * price).toFixed(4);
+                row.total = (Number(row.quantity) * Number(row.price)).toFixed(4);
             }
         },
     },

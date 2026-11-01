@@ -63,32 +63,28 @@ import UpdateTransactions from "./update.vue";
 import ImportBill from "./import.vue";
 import TranDetail from "./detail.vue";
 import { GetTransactions, Getcategory, DelTransactions } from "../../api/basic.js";
-import { msgcon } from "../../utils/message.js";
+import { msg } from "../../utils/message.ts";
 import { withDelay, convertToLimitOffset } from "../../utils/common.js";
 import { getCategoryPath } from "../../utils/category.js";
 import { formatTime } from "../../utils/date.js";
+import { setRouteQuery, getRouteQuery } from "../../utils/routeQuery";
 
 const SK_LEDGER_ALL_CATEGORY = "LEDGER_ALL_CATEGORY";
+const QUERY_KEYS = ["s", "p"];
+const QUERY_DEFAULTS = { s: 10, p: 1 };
+const DEFAULT_PAGE_SIZE = 10;
 
 export default {
     name: "TransactionsIndex",
-    components: {
-        MyTable,
-        AddTransactions,
-        UpdateTransactions,
-        TranDetail,
-        ImportBill,
-    },
+    components: { MyTable, AddTransactions, UpdateTransactions, TranDetail, ImportBill },
     setup() {
-        return {
-            Refresh,
-        };
+        return { Refresh };
     },
     data() {
         return {
             loading: true,
             pageTotal: 0,
-            pageSize: 10,
+            pageSize: DEFAULT_PAGE_SIZE,
             page: 1,
             transactions: Array.from({ length: 5 }, () => ({})),
             category: [],
@@ -99,9 +95,18 @@ export default {
                 { label: "备注", slot: "remark" },
                 { label: "操作", slot: "action" },
             ],
+            isReady: false,
         };
     },
     methods: {
+        syncToUrl() {
+            if (!this.isReady) return;
+            setRouteQuery(this.$router, this.$route, {
+                s: this.pageSize,
+                p: this.page,
+            });
+        },
+
         formatDate(time) {
             return formatTime(time);
         },
@@ -109,17 +114,18 @@ export default {
         onSyncsize(s, p) {
             this.pageSize = s;
             this.page = p;
+            this.syncToUrl();
             this.onRefresh();
         },
-
         onCurrentChange(p) {
             this.page = p;
+            this.syncToUrl();
             this.loadGetBill(this.pageSize, p);
         },
-
         onSizeChange(s) {
             this.pageSize = s;
             this.page = 1;
+            this.syncToUrl();
             this.loadGetBill(s, 1);
         },
 
@@ -135,7 +141,7 @@ export default {
                 try {
                     categoryTree = categoryStr ? JSON.parse(categoryStr) : [];
                 } catch (e) {
-                    this.$message.error(msgcon("分类数据解析失败：" + e));
+                    msg.error("分类数据解析失败：" + e);
                     categoryTree = [];
                 }
 
@@ -146,55 +152,43 @@ export default {
                 this.transactions = resp;
                 this.pageTotal = res.payload?.page_info?.total || 0;
             } catch (err) {
-                this.$message.error(msgcon("账单列表请求异常：" + err));
+                msg.error("账单列表请求异常：" + err);
             } finally {
                 this.loading = false;
             }
         },
 
-        /**
-         * Load income & expense categories, merge and save to localStorage
-         */
         async loadGetCategory() {
             try {
                 const results = await Promise.allSettled([Getcategory({ direction: 1 }), Getcategory({ direction: 2 })]);
-
                 let mergedCategoryList = [];
                 results.forEach((result) => {
                     if (result.status === "fulfilled") {
-                        const res = result.value;
-                        const rawItems = res.payload?.items;
+                        const rawItems = result.value.payload?.items;
                         const safeItems = Array.isArray(rawItems) ? rawItems : [];
                         mergedCategoryList.push(...safeItems);
                     } else {
-                        // Only print to console to avoid frequent popup notifications
                         console.error("Category sub-request failed:", result.reason);
-                        // this.$message.error(msgcon("分类请求异常 " + result.reason));
                     }
                 });
-
                 window.localStorage.setItem(SK_LEDGER_ALL_CATEGORY, JSON.stringify(mergedCategoryList));
             } catch (err) {
-                this.$message.error(msgcon("分类加载异常：" + err));
+                msg.error("分类加载异常：" + err);
             }
         },
 
-        /**
-         * Refresh data. Load categories first to eliminate race condition
-         */
         async onRefresh() {
             this.loading = true;
-            // Wait category request finished before loading bills, prevent unknown category display
             await this.loadGetCategory();
             this.loadGetBill(this.pageSize, this.page);
         },
+
         onImportBill() {
             this.$refs.ImportBill.onOpenDialog();
         },
         onAddBill() {
             this.$refs.AddTransactions.onOpenDialog();
         },
-
         onDetail(val) {
             this.$refs.TranDetail.onOpenDialog(val);
         },
@@ -211,13 +205,13 @@ export default {
             })
                 .then(async () => {
                     await DelTransactions(val.id);
-                    this.$message.success(msgcon("删除成功"));
+                    msg.success("删除成功");
                     this.onRefresh();
                 })
                 .catch((err) => {
                     if (err) {
-                        const msg = err.data?.metadata?.message || "未知错误";
-                        this.$message.error(msgcon("删除失败：" + msg));
+                        const errMsg = err?.data?.metadata?.message || "未知错误";
+                        msg.error("删除失败：" + errMsg);
                     }
                 });
         },
@@ -226,9 +220,20 @@ export default {
         this.$globalBus.emit("updateActivePath", "/transactions");
         this.refreshHandler = () => this.onRefresh();
         this.$globalBus.on("onRefresh", this.refreshHandler);
+
+        const saved = getRouteQuery(this.$route, QUERY_KEYS, QUERY_DEFAULTS);
+        const s = Number(saved.s);
+        const p = Number(saved.p);
+        this.pageSize = Number.isFinite(s) && s > 0 ? s : DEFAULT_PAGE_SIZE;
+        this.page = Number.isFinite(p) && p > 0 ? p : 1;
+
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
+
+        this.onRefresh();
     },
     beforeUnmount() {
-        // Remove global bus listener to avoid memory leak and duplicate trigger
         this.$globalBus.off("onRefresh", this.refreshHandler);
     },
 };

@@ -1,24 +1,9 @@
 <template>
     <div>
-        <!-- 顶部切换按钮组 -->
         <div style="margin-bottom: 8px; display: flex; gap: 8px; align-items: center">
             <span>视图模式：</span>
-            <button
-                @click="
-                    currentMode = 'normalBreak';
-                    renderChart();
-                "
-                :style="modeStyle('normalBreak')">
-                普通坐标轴
-            </button>
-            <button
-                @click="
-                    currentMode = 'logAxis';
-                    renderChart();
-                "
-                :style="modeStyle('logAxis')">
-                对数坐标轴
-            </button>
+            <button @click="setMode('normalBreak')" :style="modeStyle('normalBreak')">普通坐标轴</button>
+            <button @click="setMode('logAxis')" :style="modeStyle('logAxis')">对数坐标轴</button>
         </div>
         <div class="chart-card" ref="chart" style="height: 300px; width: 100%"></div>
     </div>
@@ -26,6 +11,7 @@
 <script>
 import { GetChartDay, GetChartMonth, GetChartYear } from "../../../api/basic.js";
 import { withDelay } from "../../../utils/common.js";
+import { setRouteQuery, getRouteQuery } from "../../../utils/routeQuery";
 import * as echarts from "echarts";
 
 // 按 from/to 跨度自动选接口：
@@ -39,6 +25,9 @@ function pickTrendApi(from, to) {
     if (days <= 366) return { api: GetChartMonth, word: "每月", slice: 0 };
     return { api: GetChartYear, word: "每年", slice: 0 };
 }
+
+const QUERY_MODE = "incMode";
+const VALID_MODES = ["normalBreak", "logAxis"];
 
 export default {
     name: "DayIncomeChart",
@@ -54,13 +43,23 @@ export default {
             currentMode: "normalBreak",
             cacheXData: [],
             cacheIncomeRaw: [],
-            cacheTitleWord: "每日", // 标题文案（每日 / 每月 / 每年）
+            cacheTitleWord: "每日",
+            isReady: false,
         };
     },
     mounted() {
+        // 从 URL 恢复视图模式
+        const saved = getRouteQuery(this.$route, [QUERY_MODE], { [QUERY_MODE]: "normalBreak" });
+        if (VALID_MODES.includes(saved[QUERY_MODE])) {
+            this.currentMode = saved[QUERY_MODE];
+        }
+
         this.myChart = echarts.init(this.$refs.chart);
         this.getBillChartData();
         window.addEventListener("resize", this.handleResize);
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
     },
     beforeUnmount() {
         clearTimeout(this.resizeTimer);
@@ -81,13 +80,23 @@ export default {
         },
     },
     methods: {
+        syncToUrl() {
+            if (!this.isReady) return;
+            setRouteQuery(this.$router, this.$route, { [QUERY_MODE]: this.currentMode });
+        },
+
+        setMode(mode) {
+            if (this.currentMode === mode) return;
+            this.currentMode = mode;
+            this.syncToUrl();
+            this.renderChart();
+        },
         handleResize() {
             clearTimeout(this.resizeTimer);
             this.resizeTimer = setTimeout(() => {
                 this.myChart && this.myChart.resize();
             }, 100);
         },
-        // 按钮样式
         modeStyle(mode) {
             return {
                 padding: "4px 10px",
@@ -98,7 +107,6 @@ export default {
                 cursor: "pointer",
             };
         },
-        // 四分位公共函数
         getQuartile(sorted, pos) {
             const idx = (sorted.length - 1) * pos;
             const f = Math.floor(idx);
@@ -106,11 +114,8 @@ export default {
             if (f === c) return sorted[idx];
             return sorted[f] + (sorted[c] - sorted[f]) * (idx - f);
         },
-        // 公共IQR计算，返回 {statData, upperBound, breaks, breakTipText}
         calcIQR(dataArr) {
-            const statData = [...dataArr].filter((v) => {
-                return v != null && !isNaN(v) && v > 0;
-            });
+            const statData = [...dataArr].filter((v) => v != null && !isNaN(v) && v > 0);
             let breaks = [];
             let breakTipText = "";
             let upperBound = null;
@@ -139,7 +144,6 @@ export default {
             }
             return { statData, upperBound, breaks, breakTipText };
         },
-        // 根据缓存的数据 + currentMode 渲染图表
         renderChart() {
             const xData = this.cacheXData;
             const incomeRaw = this.cacheIncomeRaw;
@@ -153,7 +157,6 @@ export default {
             let option = null;
 
             if (this.currentMode === "normalBreak") {
-                // 模式1：自动断轴
                 option = {
                     grid: {
                         left: 80,
@@ -207,15 +210,9 @@ export default {
                     ],
                 };
             } else if (this.currentMode === "logAxis") {
-                // 模式2：对数坐标轴，0 转为 '-' 断开
                 const logData = incomeRaw.map((v) => (v > 0 ? v : "-"));
                 option = {
-                    grid: {
-                        left: 80,
-                        right: 60,
-                        top: 40,
-                        bottom: 40,
-                    },
+                    grid: { left: 80, right: 60, top: 40, bottom: 40 },
                     title: {
                         text: `${titleWord}收入统计【对数坐标轴】`,
                         left: "center",

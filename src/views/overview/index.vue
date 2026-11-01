@@ -81,13 +81,17 @@
 <script>
 import { Refresh, ArrowLeft, ArrowRight } from "@element-plus/icons-vue";
 import { GetCycleSummary } from "../../api/basic.js";
+import { setRouteQuery, getRouteQuery } from "../../utils/routeQuery";
 import Category from "./charts/category.vue";
 import ExpenseRank from "./charts/expenseRank.vue";
 import DayExpenseChart from "./charts/DayExpenseChart.vue";
 import DayIncomeChart from "./charts/DayIncomeChart.vue";
 
-// 每个图表一个独立 ref，避免重复 ref 被合并成数组
 const CHART_REFS = ["dayExpenseChartRef", "dayIncomeChartRef", "categoryChartRef", "expenseRankRef"];
+
+const QUERY_KEYS = ["mode", "month", "custom"];
+const QUERY_DEFAULTS = { mode: "year", month: "", custom: null };
+const VALID_MODES = ["year", "month", "custom"];
 
 export default {
     name: "OverviewIndex",
@@ -104,15 +108,49 @@ export default {
             chartParams: null,
             incomeTotal: 0,
             expendTotal: 0,
+            isReady: false,
         };
+    },
+    watch: {
+        mode() {
+            this.syncToUrl();
+        },
+        month() {
+            this.syncToUrl();
+        },
+        custom: {
+            deep: true,
+            handler() {
+                this.syncToUrl();
+            },
+        },
     },
     created() {
         this.$globalBus.emit("updateActivePath", "/overview");
-        this.month = this.getCurrentModeDefault();
+
+        const saved = getRouteQuery(this.$route, QUERY_KEYS, QUERY_DEFAULTS);
+
+        // 关键修复：URL 里的 "2024" 会被 parseQueryValue 还原成数字 2024，
+        // 而 el-date-picker value-format="YYYY" 要求 v-model 为字符串，
+        // 数字会导致选择器不显示年份，因此这里统一 String 化。
+        const restoredMode = VALID_MODES.includes(String(saved.mode)) ? String(saved.mode) : "year";
+        this.mode = restoredMode;
+
+        if (restoredMode === "custom") {
+            this.custom = Array.isArray(saved.custom) && saved.custom.length === 2 && saved.custom[0] && saved.custom[1] ? saved.custom.map(String) : [];
+            this.month = "";
+        } else {
+            this.month = String(saved.month || this.getCurrentModeDefault());
+            this.custom = [];
+        }
+
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
+
         this.handleMonthChange();
     },
     methods: {
-        // 金额千分位 + 固定两位小数
         formatAmount(val) {
             const n = Number(val);
             if (!isFinite(n)) return "0.00";
@@ -187,8 +225,11 @@ export default {
         },
 
         handleModeChange() {
-            this.custom = this.mode === "custom" ? [] : this.custom;
-            if (this.mode !== "custom") {
+            if (this.mode === "custom") {
+                this.custom = [];
+                this.month = "";
+            } else {
+                this.custom = [];
                 this.month = this.getCurrentModeDefault();
             }
             this.handleMonthChange();
@@ -210,12 +251,26 @@ export default {
                 });
             });
         },
+
+        syncToUrl() {
+            if (!this.isReady) return;
+
+            const params = { mode: this.mode };
+
+            if (this.mode === "custom") {
+                const ok = Array.isArray(this.custom) && this.custom.length === 2 && this.custom[0] && this.custom[1];
+                params.custom = ok ? this.custom : null;
+                params.month = "";
+            } else {
+                params.month = this.month || "";
+                params.custom = null;
+            }
+            setRouteQuery(this.$router, this.$route, params);
+        },
     },
 };
 </script>
-
 <style scoped lang="less">
-/* ---------- 页面容器 ---------- */
 .page {
     display: flex;
     flex-direction: column;
@@ -224,7 +279,6 @@ export default {
     box-sizing: border-box;
 }
 
-/* ---------- 统一卡片 ---------- */
 .panel {
     background: #fff;
     border-radius: 8px;
@@ -233,7 +287,6 @@ export default {
     box-sizing: border-box;
 }
 
-/* ---------- 工具栏 ---------- */
 .toolbar {
     display: flex;
     align-items: center;
@@ -243,7 +296,6 @@ export default {
     padding: 16px 20px;
 }
 
-/* ---------- 收支统计 ---------- */
 .toolbar__stats {
     display: flex;
     align-items: center;

@@ -91,14 +91,17 @@
 </template>
 
 <script>
-import { ElMessage } from "element-plus";
 import { ArrowLeft, ArrowRight, Calendar, Refresh } from "@element-plus/icons-vue";
 import { withDelay } from "../../utils/common.js";
-import { msgcon } from "../../utils/message.js";
+import { msg } from "../../utils/message.ts";
 import { GetChartDay } from "../../api/basic.js";
+import { setRouteQuery, getRouteQuery } from "../../utils/routeQuery";
 
 const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 const TOTAL_CELLS = 42;
+
+const QUERY_KEYS = ["month"];
+const QUERY_DEFAULTS = { month: "" };
 
 export default {
     name: "CalendarView",
@@ -114,11 +117,16 @@ export default {
             summaryMap: {},
             weekdays: WEEKDAYS,
             detail: { visible: false, title: "", day: null },
+            isReady: false,
         };
     },
     computed: {
         days() {
             return this.buildDays();
+        },
+
+        urlMonth() {
+            return `${this.year}-${this.pad(this.month)}`;
         },
         monthPicker: {
             get() {
@@ -139,9 +147,48 @@ export default {
             },
         },
     },
+    watch: {
+        urlMonth() {
+            this.syncToUrl();
+        },
+    },
+    created() {
+        this.$globalBus?.emit("updateActivePath", "/calendar");
+
+        const saved = getRouteQuery(this.$route, QUERY_KEYS, QUERY_DEFAULTS);
+        const parsed = this.parseMonthParam(saved.month);
+        if (parsed) {
+            this.year = parsed.year;
+            this.month = parsed.month;
+        }
+
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
+
+        this.loadSummary();
+    },
     methods: {
         pad(n) {
             return String(n).padStart(2, "0");
+        },
+
+        parseMonthParam(val) {
+            if (!val) return null;
+            const m = /^(\d{4})-(\d{1,2})$/.exec(String(val).trim());
+            if (!m) return null;
+            const year = Number(m[1]);
+            const month = Number(m[2]);
+            if (year < 1900 || year > 3000) return null;
+            if (month < 1 || month > 12) return null;
+            return { year, month };
+        },
+
+        syncToUrl() {
+            if (!this.isReady) return;
+            setRouteQuery(this.$router, this.$route, {
+                month: this.urlMonth,
+            });
         },
 
         toDateStr(date) {
@@ -213,7 +260,7 @@ export default {
             } catch (error) {
                 console.error("加载日历数据失败：", error);
                 this.summaryMap = {};
-                ElMessage.error(msgcon("加载日历数据失败"));
+                msg.error("加载日历数据失败");
             } finally {
                 this.loading = false;
             }
@@ -261,15 +308,10 @@ export default {
             this.detail = { visible: true, title: `${day.date} 收支概览`, day };
         },
     },
-    created() {
-        this.$globalBus?.emit("updateActivePath", "/calendar");
-        this.loadSummary();
-    },
 };
 </script>
 
 <style scoped lang="less">
-/* ========== mixin ========== */
 .money-tag(@size: 18px, @fs: 11px) {
     display: inline-flex;
     align-items: center;
@@ -299,7 +341,6 @@ export default {
     }
 }
 
-/* ========== 卡片外壳 ========== */
 .calendar-page {
     --page-gap: 120px;
 
@@ -356,7 +397,6 @@ export default {
     }
 }
 
-/* ========== 日历 ========== */
 .calendar-wrapper {
     flex: 1;
     min-height: 0;
@@ -501,7 +541,6 @@ export default {
     }
 }
 
-/* ========== 弹窗 ========== */
 .detail-list {
     display: flex;
     flex-direction: column;

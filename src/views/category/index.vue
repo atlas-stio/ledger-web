@@ -95,15 +95,18 @@
 </template>
 
 <script>
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessageBox } from "element-plus";
 import { Delete, Grid, Plus, Refresh, ShoppingCart, TrendCharts } from "@element-plus/icons-vue";
 import { AddMainCategory, AddSubCategory, DelCategory, Getcategory } from "../../api/basic.js";
 import { withDelay } from "../../utils/common.js";
-import { msgcon } from "../../utils/message.js";
+import { msg } from "../../utils/message.ts";
+import { setRouteQuery, getRouteQuery } from "../../utils/routeQuery";
 
 const DIRECTIONS = { INCOME: 1, EXPENSE: 2 };
 
-/** 递归整理：去掉空 children，避免多出无意义的层级 */
+const QUERY_KEYS = ["direction", "id"];
+const QUERY_DEFAULTS = { direction: null, id: null };
+
 function normalizeCategories(list) {
     return (list ?? []).map(({ children, ...rest }) => {
         const normalizedChildren = normalizeCategories(children);
@@ -114,7 +117,6 @@ function normalizeCategories(list) {
 export default {
     name: "CategoryIndex",
     setup() {
-        // 模板中直接引用的图标
         return { Grid, Refresh, Plus, Delete };
     },
     data() {
@@ -122,8 +124,8 @@ export default {
             loading: false,
             incomeTree: [],
             expenseTree: [],
-            // 当前选中主分类：{ direction, id } | null
             selected: null,
+            isReady: false,
             dialog: {
                 visible: false,
                 title: "",
@@ -138,28 +140,15 @@ export default {
     },
     computed: {
         panels() {
-            // icon 字段直接指向组件对象，模板中通过 <component :is> 渲染
             return [
-                {
-                    direction: DIRECTIONS.INCOME,
-                    title: "收入分类",
-                    theme: "income",
-                    icon: TrendCharts,
-                    tree: this.incomeTree,
-                },
-                {
-                    direction: DIRECTIONS.EXPENSE,
-                    title: "支出分类",
-                    theme: "expense",
-                    icon: ShoppingCart,
-                    tree: this.expenseTree,
-                },
+                { direction: DIRECTIONS.INCOME, title: "收入分类", theme: "income", icon: TrendCharts, tree: this.incomeTree },
+                { direction: DIRECTIONS.EXPENSE, title: "支出分类", theme: "expense", icon: ShoppingCart, tree: this.expenseTree },
             ];
         },
         current() {
             if (!this.selected) return null;
             const list = this.selected.direction === DIRECTIONS.INCOME ? this.incomeTree : this.expenseTree;
-            return list.find((c) => c.id === this.selected.id) ?? null;
+            return list.find((c) => String(c.id) === String(this.selected.id)) ?? null;
         },
         currentDirection() {
             return this.selected?.direction ?? DIRECTIONS.INCOME;
@@ -168,19 +157,46 @@ export default {
             return this.currentDirection === DIRECTIONS.INCOME ? "income" : "expense";
         },
     },
+    watch: {
+        selected() {
+            this.syncToUrl();
+        },
+    },
     methods: {
+        restoreFromUrl() {
+            const saved = getRouteQuery(this.$route, QUERY_KEYS, QUERY_DEFAULTS);
+            const dir = Number(saved.direction);
+            const id = saved.id;
+            const validDir = dir === DIRECTIONS.INCOME || dir === DIRECTIONS.EXPENSE;
+            const validId = id !== null && id !== undefined && id !== "";
+            if (validDir && validId) {
+                this.selected = { direction: dir, id };
+            }
+        },
+
+        syncToUrl() {
+            if (!this.isReady) return;
+            if (!this.selected) {
+                setRouteQuery(this.$router, this.$route, { direction: null, id: null });
+                return;
+            }
+            setRouteQuery(this.$router, this.$route, {
+                direction: this.selected.direction,
+                id: this.selected.id,
+            });
+        },
+
         async fetchCategory(direction) {
             const res = await withDelay(() => Getcategory({ direction }));
             return normalizeCategories(res.payload?.items);
         },
 
-        /** 维护选中项：原选中仍存在则保留，否则回退到第一个主分类 */
         ensureSelection() {
             const all = [
                 ...this.incomeTree.map((c) => ({ direction: DIRECTIONS.INCOME, cat: c })),
                 ...this.expenseTree.map((c) => ({ direction: DIRECTIONS.EXPENSE, cat: c })),
             ];
-            const stillExists = this.selected && all.some((x) => x.direction === this.selected.direction && x.cat.id === this.selected.id);
+            const stillExists = this.selected && all.some((x) => x.direction === this.selected.direction && String(x.cat.id) === String(this.selected.id));
             if (!stillExists) {
                 this.selected = all.length ? { direction: all[0].direction, id: all[0].cat.id } : null;
             }
@@ -193,16 +209,15 @@ export default {
                 this.incomeTree = income;
                 this.expenseTree = expense;
                 this.ensureSelection();
-            } catch (error) {
-                console.error("加载分类失败：", error);
-                ElMessage.error(msgcon("加载分类列表失败"));
+            } catch {
+                msg.error("加载分类列表失败");
             } finally {
                 this.loading = false;
             }
         },
 
         isActive(direction, id) {
-            return this.selected?.direction === direction && this.selected?.id === id;
+            return this.selected?.direction === direction && String(this.selected?.id) === String(id);
         },
 
         select(direction, id) {
@@ -223,22 +238,22 @@ export default {
 
         async submitCreate() {
             const name = this.dialog.name.trim();
-            if (!name) return ElMessage.warning(msgcon("请输入分类名称"));
+            if (!name) return msg.warning("请输入分类名称");
 
             this.dialog.submitting = true;
             try {
                 if (this.dialog.action === "main") {
                     await withDelay(() => AddMainCategory({ name, direction: this.dialog.direction }));
-                    ElMessage.success(msgcon("新增主分类成功"));
+                    msg.success("新增主分类成功");
                 } else {
                     await withDelay(() => AddSubCategory({ id: this.dialog.parentId }, { name }));
-                    ElMessage.success(msgcon("新增子分类成功"));
+                    msg.success("新增子分类成功");
                 }
                 this.dialog.visible = false;
                 await this.loadAll();
             } catch (error) {
                 console.error("新增分类失败：", error);
-                ElMessage.error(msgcon("新增分类失败，请稍后重试"));
+                msg.error("新增分类失败，请稍后重试");
             } finally {
                 this.dialog.submitting = false;
             }
@@ -248,19 +263,19 @@ export default {
             try {
                 await ElMessageBox.confirm(`确定要删除【${name}】分类吗？`, "删除提示", { type: "warning" });
                 await withDelay(() => DelCategory(id));
-                ElMessage.success(msgcon("删除成功"));
+                msg.success("删除成功");
                 await this.loadAll();
             } catch (error) {
                 if (error !== "cancel" && error !== "close") {
                     console.error("删除分类失败：", error);
-                    ElMessage.error(msgcon("删除失败，请稍后重试"));
+                    msg.error("删除失败，请稍后重试");
                 }
             }
         },
 
         removeCategory(cat) {
             if (cat.children?.length) {
-                return ElMessage.warning(msgcon("该分类下存在子分类，无法删除"));
+                return msg.warning("该分类下存在子分类，无法删除");
             }
             this.confirmAndDelete(cat.id, cat.name);
         },
@@ -271,11 +286,17 @@ export default {
     },
     created() {
         this.$globalBus?.emit("updateActivePath", "/category");
+
+        this.restoreFromUrl();
+
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
+
         this.loadAll();
     },
 };
 </script>
-
 <style scoped lang="less">
 /* ========== 公用 mixin ========== */
 .scrollable() {

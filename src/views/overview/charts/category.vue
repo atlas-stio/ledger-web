@@ -15,6 +15,7 @@
 <script>
 import { GetChartCategory } from "../../../api/basic.js";
 import { withDelay } from "../../../utils/common.js";
+import { setRouteQuery, getRouteQuery } from "../../../utils/routeQuery";
 import * as echarts from "echarts";
 
 const PALETTE = [
@@ -40,26 +41,29 @@ const PALETTE = [
     "#269A99",
 ];
 
+const QUERY_LG = "lg";
+const VALID_LG = [1, 2];
+
 export default {
     name: "CategoryChart",
-    props: {
-        queryParams: Object,
-    },
+    props: { queryParams: Object },
     data() {
         return {
             myChart: null,
             resizeTimer: null,
             loadingFlag: false,
-            currentLg: 1, // 1 parent category / 2 sub category
+            currentLg: 1,
+            isReady: false,
         };
     },
     mounted() {
-        if (this.queryParams?.lg) {
-            this.currentLg = Number(this.queryParams.lg);
-        }
+        this.currentLg = this.resolveInitialLg();
         this.myChart = echarts.init(this.$refs.chart);
         this.getCategoryChartData();
         window.addEventListener("resize", this.handleResize);
+        this.$nextTick(() => {
+            this.isReady = true;
+        });
     },
     beforeUnmount() {
         clearTimeout(this.resizeTimer);
@@ -71,13 +75,33 @@ export default {
         queryParams: {
             handler(newVal, oldVal) {
                 if (oldVal === undefined) return;
-                if (newVal?.lg) this.currentLg = Number(newVal.lg);
+                if (newVal?.lg) {
+                    const lg = Number(newVal.lg);
+                    if (VALID_LG.includes(lg) && this.currentLg !== lg) {
+                        this.currentLg = lg;
+                    }
+                }
                 this.getCategoryChartData();
             },
             deep: true,
         },
     },
     methods: {
+        resolveInitialLg() {
+            if (this.queryParams?.lg) {
+                const qlg = Number(this.queryParams.lg);
+                if (VALID_LG.includes(qlg)) return qlg;
+            }
+            const saved = getRouteQuery(this.$route, [QUERY_LG], { [QUERY_LG]: 1 });
+            const lg = Number(saved[QUERY_LG]);
+            return VALID_LG.includes(lg) ? lg : 1;
+        },
+
+        syncToUrl() {
+            if (!this.isReady) return;
+            setRouteQuery(this.$router, this.$route, { [QUERY_LG]: this.currentLg });
+        },
+
         handleResize() {
             clearTimeout(this.resizeTimer);
             this.resizeTimer = setTimeout(() => this.myChart?.resize(), 100);
@@ -86,6 +110,7 @@ export default {
         handleLgChange(lg) {
             if (this.currentLg === lg) return;
             this.currentLg = lg;
+            this.syncToUrl();
             this.getCategoryChartData();
         },
 
@@ -96,30 +121,25 @@ export default {
             });
         },
 
-        // Aggregate API data by category
         buildCategoryMap(payload, isChild) {
             const map = new Map();
             const add = (name, amount) => {
                 const value = Number(amount) || 0;
                 if (value > 0) map.set(name, (map.get(name) || 0) + value);
             };
-
             if (isChild) {
-                // Sub category: expenseParentList -> childList
                 (payload.expenseParentList || []).forEach((parent) => {
                     (parent.childList || []).forEach((child) => {
                         add(child.subName || parent.parentName, child.amount);
                     });
                 });
             } else {
-                // Parent category: prefer the flat expenseList
                 const flatList = payload.expenseList || [];
                 if (flatList.length) {
                     flatList.forEach((item) => {
                         add(item.categoryName || item.parentName || "未知", item.amount ?? item.totalAmount);
                     });
                 } else {
-                    // Fallback: derive from expenseParentList
                     (payload.expenseParentList || []).forEach((parent) => {
                         add(parent.parentName || "未知", parent.totalAmount);
                     });
@@ -130,22 +150,13 @@ export default {
 
         async getCategoryChartData() {
             if (this.loadingFlag) return;
-
             const params = { ...(this.queryParams || {}), lg: this.currentLg };
             if (!params.from || !params.to) return;
-
             this.loadingFlag = true;
-
             try {
-                this.myChart?.showLoading({
-                    text: "加载中...",
-                    textColor: "#666",
-                    maskColor: "rgba(255,255,255,0.7)",
-                });
-
+                this.myChart?.showLoading({ text: "加载中...", textColor: "#666", maskColor: "rgba(255,255,255,0.7)" });
                 const res = await withDelay(() => GetChartCategory(params));
                 const map = this.buildCategoryMap(res?.payload || {}, this.currentLg === 2);
-
                 const pieData = [...map.entries()]
                     .map(([name, value], index) => ({
                         name,
@@ -157,18 +168,12 @@ export default {
                 if (!pieData.length) {
                     this.myChart?.clear();
                     this.myChart?.setOption({
-                        title: {
-                            text: "暂无数据",
-                            left: "center",
-                            top: "middle",
-                            textStyle: { color: "#909399", fontSize: 14, fontWeight: "normal" },
-                        },
+                        title: { text: "暂无数据", left: "center", top: "middle", textStyle: { color: "#909399", fontSize: 14, fontWeight: "normal" } },
                     });
                     return;
                 }
 
                 const total = pieData.reduce((sum, item) => sum + item.value, 0);
-
                 this.myChart.setOption(
                     {
                         tooltip: {
@@ -183,30 +188,10 @@ export default {
                                 radius: ["38%", "58%"],
                                 avoidLabelOverlap: true,
                                 minAngle: 2,
-                                itemStyle: {
-                                    borderColor: "#fff",
-                                    borderWidth: 2,
-                                    borderRadius: 4,
-                                },
-                                label: {
-                                    show: true,
-                                    position: "outside",
-                                    formatter: "{b} {d}%",
-                                    fontSize: 12,
-                                    color: "inherit",
-                                    padding: [0, 4],
-                                },
-                                labelLine: {
-                                    show: true,
-                                    length: 30,
-                                    length2: 45,
-                                    lineStyle: { width: 1, color: "inherit" },
-                                },
-                                emphasis: {
-                                    scale: true,
-                                    scaleSize: 8,
-                                    label: { fontSize: 14, fontWeight: "bold" },
-                                },
+                                itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 4 },
+                                label: { show: true, position: "outside", formatter: "{b} {d}%", fontSize: 12, color: "inherit", padding: [0, 4] },
+                                labelLine: { show: true, length: 30, length2: 45, lineStyle: { width: 1, color: "inherit" } },
+                                emphasis: { scale: true, scaleSize: 8, label: { fontSize: 14, fontWeight: "bold" } },
                                 data: pieData,
                             },
                         ],
@@ -215,25 +200,9 @@ export default {
                                 type: "text",
                                 left: "center",
                                 top: "44%",
-                                style: {
-                                    text: this.formatAmount(total),
-                                    textAlign: "center",
-                                    fill: "#303133",
-                                    fontSize: 20,
-                                    fontWeight: "bold",
-                                },
+                                style: { text: this.formatAmount(total), textAlign: "center", fill: "#303133", fontSize: 20, fontWeight: "bold" },
                             },
-                            {
-                                type: "text",
-                                left: "center",
-                                top: "53%",
-                                style: {
-                                    text: "共支出(元)",
-                                    textAlign: "center",
-                                    fill: "#909399",
-                                    fontSize: 12,
-                                },
-                            },
+                            { type: "text", left: "center", top: "53%", style: { text: "共支出(元)", textAlign: "center", fill: "#909399", fontSize: 12 } },
                         ],
                     },
                     { notMerge: true },
