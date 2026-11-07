@@ -5,7 +5,7 @@
                 <el-row :gutter="20">
                     <el-col :span="8">
                         <el-form-item label="金额" prop="amount">
-                            <el-input v-model="formdata.amount" />
+                            <el-input v-model="formdata.amount" style="width: 145px" />
                         </el-form-item>
                     </el-col>
                     <el-col :span="5">

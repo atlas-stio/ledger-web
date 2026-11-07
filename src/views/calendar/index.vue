@@ -9,7 +9,7 @@
                 <el-space>
                     <el-date-picker
                         v-model="monthPicker"
-                        class="month-picker"
+                        style="width: 140px"
                         type="month"
                         format="YYYY年MM月"
                         :clearable="false"
@@ -384,17 +384,6 @@ export default {
 .page-title {
     font-size: 16px;
     font-weight: 600;
-}
-
-.month-picker {
-    width: 150px;
-
-    :deep(.el-input__inner) {
-        font-size: 14px;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-        text-align: center;
-    }
 }
 
 .calendar-wrapper {
