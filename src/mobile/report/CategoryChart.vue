@@ -119,8 +119,8 @@ export default {
         return {
             myChart: null,
             resizeTimer: null,
-            loadingFlag: false,
-            currentLg: 1, // 1 大类 / 2 小类
+            reqSeq: 0,
+            currentLg: 1,
         };
     },
     computed: {
@@ -141,8 +141,8 @@ export default {
     },
     watch: {
         queryParams: {
-            handler(n, o) {
-                if (o !== undefined) this.getCategoryChartData();
+            handler() {
+                this.getCategoryChartData();
             },
             deep: true,
         },
@@ -194,25 +194,24 @@ export default {
             return map;
         },
         async getCategoryChartData() {
-            if (this.loadingFlag) return;
-            const params = { ...(this.queryParams || {}), lg: this.currentLg };
-            if (!params.from || !params.to) return;
+            if (!this.queryParams?.from || !this.queryParams?.to) return;
 
-            this.loadingFlag = true;
+            const params = { ...this.queryParams, lg: this.currentLg };
+            const seq = ++this.reqSeq;
+
+            this.myChart?.showLoading({
+                text: "加载中...",
+                textColor: "#666",
+                maskColor: "rgba(255,255,255,0.7)",
+            });
+
             try {
-                this.myChart?.showLoading({
-                    text: "加载中...",
-                    textColor: "#666",
-                    maskColor: "rgba(255,255,255,0.7)",
-                });
-
                 const res = await withDelay(() => GetChartCategory(params));
-                const map = this.buildCategoryMap(res?.payload || {}, this.currentLg === 2);
+                if (seq !== this.reqSeq) return;
 
-                // 1. 先按金额降序排序
+                const map = this.buildCategoryMap(res?.payload || {}, this.currentLg === 2);
                 const sortedEntries = [...map.entries()].sort((a, b) => b[1] - a[1]);
 
-                // 2. 根据排序后的结果生成数据，并给前 9 个开启 label 和 labelLine
                 const pieData = sortedEntries.map(([name, value], index) => ({
                     name,
                     value: Number(value.toFixed(2)),
@@ -251,62 +250,35 @@ export default {
                                 radius: ["32%", "48%"],
                                 avoidLabelOverlap: true,
                                 minAngle: 2,
-                                itemStyle: {
-                                    borderColor: "#fff",
-                                    borderWidth: 2,
-                                    borderRadius: 3,
-                                },
-                                // series 级别的 label，默认显示，数据项内部可以覆盖隐藏
+                                itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 3 },
                                 label: {
                                     show: true,
                                     position: "outside",
-                                    formatter: (p) => {
-                                        // 去掉截断逻辑，显示完整名称
-                                        return `{name|${p.name}}\n{percent|${p.percent}%}`;
-                                    },
+                                    formatter: (p) => `{name|${p.name}}\n{percent|${p.percent}%}`,
                                     rich: {
-                                        name: {
-                                            fontSize: 11,
-                                            color: "#303133",
-                                            lineHeight: 16,
-                                            align: "center",
-                                            fontWeight: 500,
-                                        },
-                                        percent: {
-                                            fontSize: 11,
-                                            color: "#909399",
-                                            lineHeight: 16,
-                                            align: "center",
-                                        },
+                                        name: { fontSize: 11, color: "#303133", lineHeight: 16, align: "center", fontWeight: 500 },
+                                        percent: { fontSize: 11, color: "#909399", lineHeight: 16, align: "center" },
                                     },
                                 },
                                 labelLine: {
-                                    show: true, // 数据项内部会覆盖
+                                    show: true,
                                     length: 15,
                                     length2: 35,
                                     smooth: false,
-                                    lineStyle: {
-                                        color: "#c0c4cc",
-                                        width: 1,
-                                    },
+                                    lineStyle: { color: "#c0c4cc", width: 1 },
                                 },
-                                // 3. 点击（或悬浮）时的强调状态，强制显示文字和引线
                                 emphasis: {
                                     scale: true,
                                     scaleSize: 4,
                                     label: {
                                         show: true,
-                                        formatter: (p) => {
-                                            return `{name|${p.name}}\n{percent|${p.percent}%}`;
-                                        },
+                                        formatter: (p) => `{name|${p.name}}\n{percent|${p.percent}%}`,
                                         rich: {
                                             name: { fontSize: 13, color: "#303133", fontWeight: "bold", lineHeight: 18, align: "center" },
                                             percent: { fontSize: 12, color: "#606266", lineHeight: 18, align: "center" },
                                         },
                                     },
-                                    labelLine: {
-                                        show: true, // 强制显示引线
-                                    },
+                                    labelLine: { show: true },
                                 },
                                 data: pieData,
                             },
@@ -342,8 +314,7 @@ export default {
             } catch (err) {
                 console.error("获取分类图表失败：", err);
             } finally {
-                this.myChart?.hideLoading();
-                this.loadingFlag = false;
+                if (seq === this.reqSeq) this.myChart?.hideLoading();
             }
         },
         refreshChart() {

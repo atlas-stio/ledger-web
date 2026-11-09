@@ -7,14 +7,25 @@
         <div class="chart-body" ref="chart"></div>
     </div>
 </template>
+
 <script>
-import { GetChartDay } from "../../api/basic.js";
+import { GetChartDay, GetChartMonth } from "../../api/basic.js";
 import { withDelay } from "../../utils/common.js";
 import * as echarts from "echarts";
+
 const TYPE_OPTIONS = [
     { value: "expense", label: "支出", color: "#f56c6c" },
     { value: "income", label: "收入", color: "#36cbcb" },
 ];
+
+// ≤62 天 → 日接口（X 轴 MM-DD）；其余（含整年）→ 月接口（X 轴 1月-12月）
+function pickTrendApi(from, to) {
+    if (!from || !to) return { api: GetChartDay, mode: "day" };
+    const days = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+    if (days <= 62) return { api: GetChartDay, mode: "day" };
+    return { api: GetChartMonth, mode: "month" };
+}
+
 export default {
     name: "DayChart",
     props: {
@@ -25,7 +36,7 @@ export default {
         return {
             myChart: null,
             resizeTimer: null,
-            loadingFlag: false,
+            reqSeq: 0,
             chartData: { xData: [], incomeData: [], expenseData: [] },
         };
     },
@@ -54,12 +65,13 @@ export default {
     },
     watch: {
         queryParams: {
-            handler(n, o) {
-                if (o !== undefined) this.getBillChartData();
+            handler() {
+                this.getBillChartData();
             },
             deep: true,
         },
         type() {
+            // 数据里同时含收入/支出，切换类型只需重绘
             this.renderChart();
         },
     },
@@ -75,7 +87,6 @@ export default {
             if (f === c) return sorted[idx];
             return sorted[f] + (sorted[c] - sorted[f]) * (idx - f);
         },
-        // IQR 计算断轴区间：只要最大值超出上界就断
         calcIQR(dataArr) {
             const statData = dataArr.filter((v) => v != null && !isNaN(v) && Number(v) > 0).map(Number);
             let breaks = [];
@@ -98,39 +109,81 @@ export default {
             }
             return { breaks };
         },
+        // 月统计 → 12 个月点：保证与全年合计一致
+        buildMonths(list, field) {
+            const map = new Map();
+            list.forEach((item) => {
+                const key = String(item.day).slice(0, 7);
+                map.set(key, Number(item[field]) || 0);
+            });
+            const year = list.length ? String(list[0].day).slice(0, 4) : String(new Date().getFullYear());
+            const xData = [];
+            const data = [];
+            for (let m = 1; m <= 12; m++) {
+                const mm = String(m).padStart(2, "0");
+                xData.push(`${m}月`);
+                data.push(Number((map.get(`${year}-${mm}`) || 0).toFixed(2)));
+            }
+            return { xData, data };
+        },
         async getBillChartData() {
-            if (!this.queryParams || this.loadingFlag) return;
-            this.loadingFlag = true;
+            if (!this.queryParams?.from || !this.queryParams?.to) return;
+
+            const seq = ++this.reqSeq;
+            this.myChart?.showLoading({
+                text: "加载中...",
+                textColor: "#666",
+                maskColor: "rgba(255,255,255,0.7)",
+            });
+
             try {
-                this.myChart?.showLoading({
-                    text: "加载中...",
-                    textColor: "#666",
-                    maskColor: "rgba(255,255,255,0.7)",
-                });
-                const res = await withDelay(() => GetChartDay(this.queryParams));
-                const list = res.payload || [];
-                const xData = [],
-                    incomeData = [],
-                    expenseData = [];
-                list.forEach((item) => {
-                    xData.push(item.day.slice(5));
-                    incomeData.push(Number(item.income));
-                    expenseData.push(Number(item.expense));
-                });
+                const { api, mode } = pickTrendApi(this.queryParams.from, this.queryParams.to);
+                const res = await withDelay(() => api(this.queryParams));
+                if (seq !== this.reqSeq) return; // 丢弃过期结果
+
+                const list = res?.payload || [];
+                const xData = [];
+                const incomeData = [];
+                const expenseData = [];
+
+                if (mode === "month") {
+                    const exp = this.buildMonths(list, "expense");
+                    const inc = this.buildMonths(list, "income");
+                    xData.push(...exp.xData);
+                    expenseData.push(...exp.data);
+                    incomeData.push(...inc.data);
+                } else {
+                    list.forEach((item) => {
+                        xData.push(item.day.slice(5));
+                        incomeData.push(Number(item.income));
+                        expenseData.push(Number(item.expense));
+                    });
+                }
+
                 this.chartData = { xData, incomeData, expenseData };
                 this.renderChart();
             } catch (err) {
                 console.error("获取每日收支图表失败：", err);
             } finally {
-                this.myChart?.hideLoading();
-                this.loadingFlag = false;
+                if (seq === this.reqSeq) this.myChart?.hideLoading();
             }
         },
         renderChart() {
             if (!this.myChart) return;
             const { xData } = this.chartData;
             const rawData = this.activeRawData;
-            if (!xData.length) return;
+            if (!xData.length) {
+                this.myChart.clear();
+                this.myChart.setOption({
+                    title: {
+                        text: "暂无数据",
+                        left: "center",
+                        top: "middle",
+                        textStyle: { color: "#909399", fontSize: 14, fontWeight: "normal" },
+                    },
+                });
+                return;
+            }
 
             const { breaks } = this.calcIQR(rawData);
 
@@ -185,6 +238,7 @@ export default {
     },
 };
 </script>
+
 <style scoped>
 .chart-card {
     width: 100%;

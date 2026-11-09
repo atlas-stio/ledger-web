@@ -31,7 +31,6 @@ import { GetStatistic } from "../../api/basic.js";
 export default {
     name: "BillStatistic",
     props: {
-        // 仅用于高亮当前图表展示的类型，卡片始终同时显示支出和收入
         type: { type: String, default: "expense" },
         queryParams: Object,
     },
@@ -39,13 +38,20 @@ export default {
         return {
             income: "0.00",
             expense: "0.00",
+            reqSeq: 0,
         };
     },
     computed: {
         rangeText() {
-            const month = this.queryParams?.month;
+            const p = this.queryParams;
+            if (!p) return "";
+            // 年报：YYYY  月报：YYYY-MM
+            if (p.month && /^\d{4}$/.test(String(p.month))) {
+                return `${p.month}年`;
+            }
+            const month = p.month;
             if (!month) return "";
-            const [y, m] = month.split("-");
+            const [y, m] = String(month).split("-");
             return `${y}年${m}月`;
         },
     },
@@ -54,8 +60,8 @@ export default {
     },
     watch: {
         queryParams: {
-            handler(n, o) {
-                if (o !== undefined) this.getBillStatistic();
+            handler() {
+                this.getBillStatistic();
             },
             deep: true,
         },
@@ -68,27 +74,52 @@ export default {
             });
         },
         async getBillStatistic() {
-            const month = this.queryParams?.month;
-            if (!month) return;
+            const p = this.queryParams;
+            if (!p?.from) return;
+
+            const isYear = p.month && /^\d{4}$/.test(String(p.month));
+
+            // 构造请求参数
+            const reqParams = {
+                sa: "s01",
+                // 年报传 pt: "year"，月报传 pt: "month"
+                pt: isYear ? "year" : "month",
+                from: p.from,
+                to: p.to,
+            };
+
+            // 如果后端 pt: "year" 不支持完整日期格式，传年份即可
+            if (isYear) {
+                reqParams.from = String(p.month); // "2026"
+                reqParams.to = String(p.month);
+            } else {
+                // 月报只需精确到月
+                reqParams.from = String(p.from).slice(0, 7); // "2026-01"
+                reqParams.to = String(p.to).slice(0, 7);
+            }
+
+            const seq = ++this.reqSeq;
             try {
-                const res = await GetStatistic({
-                    sa: "s01",
-                    pt: "month",
-                    from: month, // "2026-03"
-                    to: month,
-                });
+                const res = await GetStatistic(reqParams);
+                if (seq !== this.reqSeq) return; // 丢弃过期结果
+
                 if (res?.payload) {
                     this.income = res.payload.income || "0.00";
                     this.expense = res.payload.expense || "0.00";
                 }
             } catch {
-                msg.error("获取收支统计失败");
+                if (seq === this.reqSeq) msg.error("获取收支统计失败");
             }
+        },
+        refreshChart() {
+            this.getBillStatistic();
         },
     },
 };
 </script>
+
 <style scoped>
+/* 样式保持不变 */
 .card-box {
     width: 100%;
     background: #fff;
@@ -119,7 +150,6 @@ export default {
     max-width: 60%;
 }
 
-/* 左右两栏并排 */
 .amount-box {
     display: flex;
     align-items: stretch;
@@ -133,7 +163,6 @@ export default {
     position: relative;
 }
 
-/* 当前图表展示的类型：加底部指示条 + 数字放大 */
 .amount-item.active::after {
     content: "";
     position: absolute;
@@ -168,7 +197,6 @@ export default {
     gap: 4px;
 }
 
-/* 当前选中类型的小圆点 */
 .dot {
     display: inline-block;
     width: 5px;
@@ -193,7 +221,6 @@ export default {
     text-overflow: ellipsis;
 }
 
-/* 当前选中类型数字放大，另一个稍小、略淡 */
 .amount-item.active .amount-value {
     font-size: 24px;
 }

@@ -12,7 +12,6 @@ import { GetChartExpenseRank } from "../../api/basic.js";
 import { withDelay } from "../../utils/common.js";
 import * as echarts from "echarts";
 
-// 统一使用前文定义的支出/收入主题色
 const EXPENSE_COLOR = "#f56c6c";
 const INCOME_COLOR = "#36cbcb";
 
@@ -26,7 +25,7 @@ export default {
         return {
             myChart: null,
             resizeTimer: null,
-            loadingFlag: false,
+            reqSeq: 0,
         };
     },
     computed: {
@@ -46,14 +45,12 @@ export default {
         this.myChart = null;
     },
     watch: {
-        // 月份变化：重新请求
         queryParams: {
-            handler(n, o) {
-                if (o !== undefined) this.getRankChartData();
+            handler() {
+                this.getRankChartData();
             },
             deep: true,
         },
-        // 收支类型变化：重新请求（因为排行接口带了 dt 参数）
         type() {
             this.getRankChartData();
         },
@@ -63,37 +60,29 @@ export default {
             clearTimeout(this.resizeTimer);
             this.resizeTimer = setTimeout(() => this.myChart?.resize(), 100);
         },
-
         formatAmount(val) {
             return (Number(val) || 0).toLocaleString("zh-CN", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             });
         },
-
         async getRankChartData() {
-            if (this.loadingFlag) return;
+            if (!this.queryParams?.from || !this.queryParams?.to) return;
 
-            // 接口参数：dt=2 为支出，dt=1 为收入
-            const params = {
-                ...(this.queryParams || {}),
-                dt: this.isExpense ? 2 : 1,
-            };
-            if (!params.from || !params.to) return;
+            const params = { ...this.queryParams, dt: this.isExpense ? 2 : 1 };
+            const seq = ++this.reqSeq;
 
-            this.loadingFlag = true;
+            this.myChart?.showLoading({
+                text: "加载中...",
+                textColor: "#666",
+                maskColor: "rgba(255,255,255,0.7)",
+            });
 
             try {
-                this.myChart?.showLoading({
-                    text: "加载中...",
-                    textColor: "#666",
-                    maskColor: "rgba(255,255,255,0.7)",
-                });
-
                 const res = await withDelay(() => GetChartExpenseRank(params));
-                const list = res?.payload?.list || [];
+                if (seq !== this.reqSeq) return;
 
-                // 排序并取前 10
+                const list = res?.payload?.list || [];
                 const rankData = list
                     .map((item) => ({
                         name: item.categoryName || "未知",
@@ -116,7 +105,6 @@ export default {
                     return;
                 }
 
-                // 横向柱状图是从下往上画的，所以反转数组让第一名在最上面
                 const names = rankData.map((item) => item.name).reverse();
                 const values = rankData.map((item) => item.value).reverse();
                 const maxValue = Math.max(...values);
@@ -124,13 +112,7 @@ export default {
 
                 this.myChart.setOption(
                     {
-                        grid: {
-                            left: 12,
-                            right: 70,
-                            top: 10,
-                            bottom: 10,
-                            containLabel: true,
-                        },
+                        grid: { left: 12, right: 70, top: 10, bottom: 10, containLabel: true },
                         tooltip: {
                             trigger: "axis",
                             axisPointer: { type: "shadow" },
@@ -142,7 +124,7 @@ export default {
                         },
                         xAxis: {
                             type: "value",
-                            max: maxValue * 1.15, // 右侧留白给数值标签
+                            max: maxValue * 1.15,
                             axisLine: { show: false },
                             axisTick: { show: false },
                             axisLabel: { show: false },
@@ -153,23 +135,14 @@ export default {
                             data: names,
                             axisLine: { show: false },
                             axisTick: { show: false },
-                            axisLabel: {
-                                color: "#606266",
-                                fontSize: 12,
-                                width: 60, // 限制最大宽度
-                                overflow: "truncate", // 文字超出截断
-                            },
+                            axisLabel: { color: "#606266", fontSize: 12, width: 60, overflow: "truncate" },
                         },
                         series: [
                             {
                                 type: "bar",
                                 data: values,
-                                barWidth: 12, // 手机端柱子稍微细一点更精致
-                                itemStyle: {
-                                    color: barColor,
-                                    borderRadius: [0, 6, 6, 0],
-                                },
-                                // 右侧数值标签
+                                barWidth: 12,
+                                itemStyle: { color: barColor, borderRadius: [0, 6, 6, 0] },
                                 label: {
                                     show: true,
                                     position: "right",
@@ -178,12 +151,8 @@ export default {
                                     color: "#606266",
                                     fontSize: 11,
                                 },
-                                // 底部灰色轨道
                                 showBackground: true,
-                                backgroundStyle: {
-                                    color: "rgba(0, 0, 0, 0.04)",
-                                    borderRadius: [0, 6, 6, 0],
-                                },
+                                backgroundStyle: { color: "rgba(0, 0, 0, 0.04)", borderRadius: [0, 6, 6, 0] },
                             },
                         ],
                     },
@@ -192,9 +161,11 @@ export default {
             } catch (err) {
                 console.error("获取分类排行图表失败：", err);
             } finally {
-                this.myChart?.hideLoading();
-                this.loadingFlag = false;
+                if (seq === this.reqSeq) this.myChart?.hideLoading();
             }
+        },
+        refreshChart() {
+            this.getRankChartData();
         },
     },
 };
@@ -222,7 +193,6 @@ export default {
     color: #303133;
 }
 
-/* 手机端柱状图高度 */
 .chart-body {
     height: 280px;
     width: 100%;

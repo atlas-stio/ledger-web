@@ -4,6 +4,20 @@
         <div class="header">
             <div class="header-row">
                 <span class="header-title">账单统计</span>
+                <div class="period-switch">
+                    <div
+                        v-for="item in periodOptions"
+                        :key="item.value"
+                        class="switch-item period-item"
+                        :class="{ active: currentPeriod === item.value }"
+                        :style="currentPeriod === item.value ? { background: item.color, color: '#fff' } : {}"
+                        @click="currentPeriod = item.value">
+                        {{ item.label }}
+                    </div>
+                </div>
+            </div>
+            <div class="date-row">
+                <!-- 收支切换 -->
                 <div class="type-switch">
                     <div
                         v-for="item in typeOptions"
@@ -15,9 +29,20 @@
                         {{ item.label }}
                     </div>
                 </div>
-            </div>
-            <div class="date-row">
+
+                <!-- 日期选择器 -->
                 <el-date-picker
+                    v-if="currentPeriod === 'year'"
+                    v-model="currentYear"
+                    type="year"
+                    placeholder="选择年份"
+                    format="YYYY年"
+                    value-format="YYYY"
+                    :clearable="false"
+                    class="month-picker" />
+
+                <el-date-picker
+                    v-else
                     v-model="currentMonth"
                     type="month"
                     placeholder="选择月份"
@@ -25,10 +50,11 @@
                     value-format="YYYY-MM"
                     :clearable="false"
                     class="month-picker" />
-                <button class="month-btn" @click="changeMonth(-1)" aria-label="上一月">
+
+                <button class="ctrl-btn" @click="changePeriod(-1)" aria-label="上一期">
                     <span class="arrow">‹</span>
                 </button>
-                <button class="month-btn" @click="changeMonth(1)" aria-label="下一月">
+                <button class="ctrl-btn" @click="changePeriod(1)" aria-label="下一期">
                     <span class="arrow">›</span>
                 </button>
             </div>
@@ -36,11 +62,10 @@
 
         <!-- 内容区 -->
         <div class="content">
-            <BillStatistic :type="currentType" :query-params="queryParams" />
-            <DayChart :type="currentType" :query-params="queryParams" />
-            <CategoryChart :type="currentType" :query-params="queryParams" />
-            <!-- 补回排行卡片 -->
-            <RankChart :type="currentType" :query-params="queryParams" />
+            <BillStatistic ref="billStatisticRef" :type="currentType" :query-params="chartParams" />
+            <DayChart ref="dayChartRef" :type="currentType" :query-params="chartParams" />
+            <CategoryChart ref="categoryChartRef" :type="currentType" :query-params="chartParams" />
+            <RankChart ref="rankChartRef" :type="currentType" :query-params="chartParams" />
         </div>
     </div>
 </template>
@@ -49,12 +74,16 @@
 import BillStatistic from "./BillStatistic.vue";
 import DayChart from "./DayChart.vue";
 import CategoryChart from "./CategoryChart.vue";
-// 补回引入
 import RankChart from "./RankChart.vue";
 
 const TYPE_OPTIONS = [
     { value: "expense", label: "支出", color: "#f56c6c" },
     { value: "income", label: "收入", color: "#36cbcb" },
+];
+
+const PERIOD_OPTIONS = [
+    { value: "year", label: "年报", color: "#409eff" },
+    { value: "month", label: "月报", color: "#409eff" },
 ];
 
 function currentMonthStr() {
@@ -64,34 +93,69 @@ function currentMonthStr() {
     return `${y}-${m}`;
 }
 
+function currentYearStr() {
+    return new Date().getFullYear().toString();
+}
+
 export default {
-    // 补回注册
     components: { BillStatistic, DayChart, CategoryChart, RankChart },
     data() {
         return {
             typeOptions: TYPE_OPTIONS,
-            currentType: "expense", // 全局收支类型
-            currentMonth: currentMonthStr(), // "2026-03"
+            periodOptions: PERIOD_OPTIONS,
+            currentType: "expense",
+            currentPeriod: "month",
+            currentMonth: currentMonthStr(),
+            currentYear: currentYearStr(),
+            // 对齐 PC 端：用 data 维护查询参数，变化后主动刷新子组件
+            chartParams: null,
         };
     },
-    computed: {
-        queryParams() {
-            const month = this.currentMonth || currentMonthStr();
-            const [y, m] = month.split("-").map(Number);
-            const lastDay = new Date(y, m, 0).getDate();
-            return {
-                month,
-                from: `${month}-01`,
-                to: `${month}-${String(lastDay).padStart(2, "0")}`,
-            };
-        },
+    watch: {
+        currentPeriod: "buildParams",
+        currentMonth: "buildParams",
+        currentYear: "buildParams",
+    },
+    created() {
+        this.buildParams();
     },
     methods: {
-        // offset: -1 上一月 / +1 下一月，跨年自动进位
-        changeMonth(offset) {
+        buildParams() {
+            if (this.currentPeriod === "year") {
+                const year = this.currentYear || currentYearStr();
+                this.chartParams = {
+                    month: year,
+                    year,
+                    from: `${year}-01-01`,
+                    to: `${year}-12-31`,
+                };
+            } else {
+                const month = this.currentMonth || currentMonthStr();
+                const [y, m] = month.split("-").map(Number);
+                const lastDay = new Date(y, m, 0).getDate();
+                this.chartParams = {
+                    month,
+                    from: `${month}-01`,
+                    to: `${month}-${String(lastDay).padStart(2, "0")}`,
+                };
+            }
+            // 赋新对象后，主动刷新所有子组件（对齐 PC 端 refreshChartComponent）
+            this.$nextTick(() => this.refreshAllCharts());
+        },
+        refreshAllCharts() {
+            ["billStatisticRef", "dayChartRef", "categoryChartRef", "rankChartRef"].forEach((k) => {
+                this.$refs[k]?.refreshChart?.();
+            });
+        },
+        // offset: -1 上一期 / +1 下一期
+        changePeriod(offset) {
+            if (this.currentPeriod === "year") {
+                const baseYear = Number(this.currentYear || currentYearStr());
+                this.currentYear = String(baseYear + offset);
+                return;
+            }
             const base = this.currentMonth || currentMonthStr();
             const [y, m] = base.split("-").map(Number);
-            // Date 月份从 0 开始，所以用 m - 1 + offset；跨年由 Date 自动处理
             const d = new Date(y, m - 1 + offset, 1);
             const ny = d.getFullYear();
             const nm = (d.getMonth() + 1).toString().padStart(2, "0");
@@ -131,35 +195,60 @@ export default {
     color: #303133;
 }
 
-.type-switch {
+/* ========== 统一切换容器 ========== */
+.type-switch,
+.period-switch {
     display: flex;
     padding: 2px;
     background: #f5f5f5;
     border-radius: 8px;
+    flex-shrink: 0;
 }
 
 .switch-item {
-    padding: 5px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 14px;
     font-size: 13px;
     color: #606266;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 500;
+    white-space: nowrap;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
-/* ========== 月份选择器 + 上一月/下一月 ========== */
+.period-switch {
+    padding: 2px;
+    border-radius: 7px;
+}
+
+.period-item {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 5px;
+}
+
+/* ========== 日期行 ========== */
 .date-row {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-/* 左右切换按钮（保留你最新调整的 62px 宽度） */
-.month-btn {
+.date-row .type-switch {
     flex-shrink: 0;
-    width: 62px;
-    height: 36px;
+}
+
+.ctrl-btn {
+    flex-shrink: 0;
+    width: 44px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -175,18 +264,17 @@ export default {
     box-sizing: border-box;
 }
 
-.month-btn:active {
+.ctrl-btn:active {
     background: #e8eaed;
 }
 
-.month-btn .arrow {
-    font-size: 22px;
+.ctrl-btn .arrow {
+    font-size: 20px;
     line-height: 1;
     font-weight: 600;
     transform: translateY(-1px);
 }
 
-/* 中间月份选择器占满剩余空间 */
 .month-picker {
     flex: 1;
     min-width: 0;
@@ -195,7 +283,7 @@ export default {
 /* ========== 强制对齐 Element 输入框 ========== */
 .date-row :deep(.el-date-editor.el-input),
 .date-row :deep(.el-input__wrapper) {
-    height: 36px;
+    height: 32px;
     width: 100%;
     box-sizing: border-box;
 }
