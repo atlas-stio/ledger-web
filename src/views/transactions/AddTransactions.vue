@@ -67,7 +67,7 @@
                     <el-input ref="remarkInput" v-model="formdata.remark" style="width: 100%">
                         <template #append>
                             <el-tooltip content="键入分隔符" placement="top">
-                                <el-button link @click="appendSeparator">｜</el-button>
+                                <el-button link @click="appendSeparator('｜')">｜</el-button>
                             </el-tooltip>
                         </template>
                     </el-input>
@@ -256,9 +256,9 @@ export default {
         copyDetailsJson() {
             copyText(serializeDetailRows(this.detailRows), msg.success, msg.error);
         },
-        appendSeparator() {
+        appendSeparator(sep) {
             const input = this.$refs.remarkInput?.$el?.querySelector("input");
-            const { value, caret } = insertSeparator(this.formdata.remark, input);
+            const { value, caret } = insertSeparator(this.formdata.remark, input, sep);
             this.formdata.remark = value;
             this.$nextTick(() => {
                 if (input) {
