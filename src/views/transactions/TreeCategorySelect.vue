@@ -1,6 +1,5 @@
 <template>
     <div v-loading="loading">
-        <!-- 一级分类 整行横向排列（固定不会被撑开） -->
         <div class="category-row parent-row">
             <div
                 v-for="item in categoryList"

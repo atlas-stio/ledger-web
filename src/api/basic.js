@@ -43,3 +43,11 @@ export const Getcategory = (params) => ajax("/api/ledger/v1/category", "GET", pa
 export const DelCategory = (id) => ajax(`/api/ledger/v1/category/${id}`, "DELETE", null, null);
 export const AddSubCategory = (paths, data) => ajax(`/api/ledger/v1/category/${paths.id}/sub`, "POST", null, data);
 export const AddMainCategory = (data) => ajax(`/api/ledger/v1/category/main`, "POST", null, data);
+
+// 标签
+//   GET /v1/tags/hot         高频推荐标签 ?limit=10
+//   GET /v1/tags/search      模糊搜索历史标签 ?keyword=xx&limit=10
+//   GET /v1/bill/:id/tags    查询某条账单全部标签
+export const GetHotTags = (params) => ajax("/api/ledger/v1/tags/hot", "GET", params, null);
+export const SearchTags = (params) => ajax("/api/ledger/v1/tags/search", "GET", params, null);
+export const GetBillTags = (id) => ajax(`/api/ledger/v1/bill/${id}/tags`, "GET", null, null);

@@ -129,17 +129,19 @@
                     {{ row.category_title }}
                 </template>
                 <template #amount="{ row }">
-                    <span :style="{ color: row.amount > 0 ? '#f53f3f' : undefined }">
-                        {{ row.amount }}
+                    <span class="amount-text" :class="amountClass(row.amount)">
+                        {{ formatAmount(row.amount) }}
                     </span>
                 </template>
                 <template #remark="{ row }">
                     {{ row.remark }}
                 </template>
                 <template #action="{ row }">
-                    <el-button link type="primary" @click="onDetail(row)">详情</el-button>
-                    <el-button link type="primary" @click="onUpdate(row)">修改</el-button>
-                    <el-button link type="primary" @click="onDeleteTransactions(row)">删除</el-button>
+                    <el-space>
+                        <el-button link type="primary" @click="onDetail(row)">详情</el-button>
+                        <el-button link type="primary" @click="onUpdate(row)">修改</el-button>
+                        <el-button link type="primary" @click="onDeleteTransactions(row)">删除</el-button>
+                    </el-space>
                 </template>
             </MyTable>
 
@@ -168,26 +170,13 @@ import { withDelay, convertToLimitOffset } from "../../utils/common.js";
 import { getCategoryPath } from "../../utils/category.js";
 import { formatTime } from "../../utils/date.js";
 import { getRouteQuery } from "../../utils/routeQuery";
+import { SK_LEDGER_ALL_CATEGORY, DEFAULT_PAGE_SIZE, ONE_DAY_MS, SORT_WHITELIST, ORDER_WHITELIST, SEARCH_KEYS, QUERY_KEYS } from "./constants.js";
+import { formatAmountValue } from "./utils.js";
 
-const SK_LEDGER_ALL_CATEGORY = "LEDGER_ALL_CATEGORY";
-const DEFAULT_PAGE_SIZE = 10;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-// 排序白名单
-const SORT_WHITELIST = ["occ_at", "amount", "create_time"];
-const ORDER_WHITELIST = ["asc", "desc"];
-
-// URL 里与搜索相关的参数 key（不含分页 s/p）
-const SEARCH_KEYS = ["cid", "keyword", "direction", "from", "to", "min_amount", "max_amount", "sort", "order"];
-// 从 URL 读取时关注的 key（含分页）
-const QUERY_KEYS = ["s", "p", ...SEARCH_KEYS];
-
-// 判断搜索值是否为空
 function isEmpty(v) {
     return v === "" || v == null;
 }
 
-// 空搜索表单
 function emptySearchForm() {
     return {
         cid: null,
@@ -230,7 +219,7 @@ export default {
             columns: [
                 { label: "交易时间", slot: "occ_time" },
                 { label: "类别", slot: "category_title" },
-                { label: "金额(¥)", slot: "amount" },
+                { label: "金额", slot: "amount" },
                 { label: "备注", slot: "remark" },
                 { label: "操作", slot: "action" },
             ],
@@ -275,12 +264,22 @@ export default {
         this.onRefresh();
     },
     methods: {
-        // ===== 工具方法 =====
         formatDate(time) {
             return formatTime(time);
         },
+        formatAmount(value) {
+            return formatAmountValue(value);
+        },
+        /**
+         * 金额颜色：>0 收入、<0 支出、0 或无效值不着色
+         * 颜色语义与 detail.vue 保持一致
+         */
+        amountClass(amount) {
+            const n = Number(amount);
+            if (Number.isNaN(n) || n === 0) return "";
+            return n > 0 ? "income-text" : "expense-text";
+        },
 
-        // ===== 弹框外部点击关闭 =====
         handleOutsideClick(e) {
             if (!this.advancedVisible) return;
             const el = this.$refs.popoverContentRef;
@@ -289,7 +288,6 @@ export default {
             this.advancedVisible = false;
         },
 
-        // ===== URL 同步 =====
         replaceQuery(extra) {
             if (!this.isReady) return;
             const newQuery = { ...this.$route.query };
@@ -307,7 +305,6 @@ export default {
             this.replaceQuery({ p: 1 });
         },
 
-        // ===== 参数构建 =====
         buildSearchParams() {
             const f = this.searchForm;
             const p = {};
@@ -325,7 +322,6 @@ export default {
             return p;
         },
 
-        // ===== 查询动作 =====
         onSearch() {
             this.page = 1;
             this.advancedVisible = false;
@@ -341,7 +337,6 @@ export default {
             this.loadGetBill(this.pageSize, 1);
         },
 
-        // ===== 月份切换 =====
         onMonthPickerChange(val) {
             if (!val) return;
             const d = new Date(val);
@@ -362,12 +357,10 @@ export default {
         },
 
         applyMonthRange(year, month) {
-            // 该月 1 号 ~ 下月 1 号（applyDateRange 内部 to -1 天抵消 buildSearchParams 的 +1 天）
             this.applyDateRange(new Date(year, month, 1), new Date(year, month + 1, 1));
         },
 
         applyDateRange(fromDate, toDate) {
-            // buildSearchParams 会给 to +1 天，这里先 -1 天抵消
             this.searchForm.dateRange = [fromDate.getTime(), toDate.getTime() - ONE_DAY_MS];
             this.page = 1;
             this.advancedVisible = false;
@@ -375,7 +368,6 @@ export default {
             this.loadGetBill(this.pageSize, 1);
         },
 
-        // ===== 分页 =====
         onSyncsize(s, p) {
             this.pageSize = s;
             this.page = p;
@@ -394,7 +386,6 @@ export default {
             this.loadGetBill(s, 1);
         },
 
-        // ===== 数据加载 =====
         readCategoryTree() {
             try {
                 const str = window.localStorage.getItem(SK_LEDGER_ALL_CATEGORY);
@@ -449,7 +440,6 @@ export default {
             this.loadGetBill(this.pageSize, this.page);
         },
 
-        // ===== 弹窗/操作 =====
         onImportBill() {
             this.$refs.ImportBill.onOpenDialog();
         },
@@ -480,7 +470,6 @@ export default {
                 });
         },
 
-        // ===== 从 URL 恢复 =====
         restoreFromUrl() {
             const saved = getRouteQuery(this.$route, QUERY_KEYS, { s: DEFAULT_PAGE_SIZE, p: 1 });
             const s = Number(saved.s);
@@ -491,7 +480,7 @@ export default {
             const f = this.searchForm;
             f.cid = saved.cid ? Number(saved.cid) : null;
             f.keyword = saved.keyword || "";
-            f.direction = saved.direction ? Number(saved.direction) : 0; // 默认 0 = 全部
+            f.direction = saved.direction ? Number(saved.direction) : 0;
             if (saved.from && saved.to) {
                 f.dateRange = [Number(saved.from), Number(saved.to) - ONE_DAY_MS];
                 const d = new Date(Number(saved.from));
@@ -514,50 +503,40 @@ export default {
     gap: 12px;
     flex-wrap: wrap;
 }
-
 .advanced-form :deep(.el-form-item) {
     margin-bottom: 14px;
 }
-
 .advanced-form :deep(.el-form-item__label) {
     pointer-events: none;
 }
-
 .amount-range {
     display: flex;
     align-items: center;
 }
-
 .amount-sep {
     margin: 0 6px;
     color: #999;
 }
-
 .direction-radio-group {
     display: flex;
     width: 100%;
     gap: 8px;
 }
-
 .direction-radio-group :deep(.el-radio) {
     flex: 1;
     min-width: 0;
     margin: 0;
     justify-content: center;
 }
-
 .sort-row {
     display: flex;
     align-items: center;
     width: 100%;
 }
-
-/* 高级查询按钮 + 角标飘右上角 */
 .advanced-btn {
     position: relative;
     overflow: visible;
 }
-
 .advanced-badge {
     position: absolute;
     top: -6px;
@@ -565,9 +544,16 @@ export default {
     margin: 0;
     pointer-events: none;
 }
-
-/* 让 el-card 允许弹框溢出 */
 .transactions-card {
     overflow: visible !important;
+}
+.amount-text {
+    font-weight: 600;
+}
+.income-text {
+    color: var(--color-income);
+}
+.expense-text {
+    color: var(--color-expense);
 }
 </style>

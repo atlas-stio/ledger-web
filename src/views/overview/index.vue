@@ -51,9 +51,9 @@
                 </el-button-group>
 
                 <el-radio-group v-model="mode" @change="handleModeChange">
-                    <el-radio-button label="year">年报</el-radio-button>
-                    <el-radio-button label="month">月报</el-radio-button>
-                    <el-radio-button label="custom">自定义</el-radio-button>
+                    <el-radio-button label="年报" value="year" />
+                    <el-radio-button label="月报" value="month" />
+                    <el-radio-button label="自定义" value="custom" />
                 </el-radio-group>
 
                 <el-button type="primary" :icon="Refresh" :loading="loading" @click="onRefresh">刷新</el-button>
@@ -275,7 +275,6 @@ export default {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 12px;
     box-sizing: border-box;
 }
 
@@ -332,11 +331,11 @@ export default {
         sans-serif;
 
     &--income {
-        color: #13a3a3;
+        color: var(--color-income);
     }
 
     &--expense {
-        color: #e54d4d;
+        color: var(--color-expense);
     }
 }
 

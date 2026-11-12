@@ -1,6 +1,5 @@
 <template>
     <el-dialog title="导入记账" v-model="dialogVisible" :close-on-click-modal="false" width="720px" draggable @closed="onClosed">
-        <!-- Upload: shown only when no data loaded yet -->
         <el-upload
             v-if="!parsedData.length"
             ref="uploadRef"
@@ -15,12 +14,11 @@
             <template #tip>
                 <div class="el-upload__tip">
                     仅支持 .csv 格式，第一行作为字段名（表头）<br />
-                    必需列：<b>cid, occ_time, amount, remark</b>；可选列：<b>detail</b>（JSON 字符串，无明细请留空）
+                    必需列：<b>cid, occ_time, amount, remark</b>； 可选列：<b>detail</b>（JSON 字符串，无明细请留空）、<b>tags</b>（标签， 逗号分隔）
                 </div>
             </template>
         </el-upload>
 
-        <!-- Download template -->
         <div v-if="!parsedData.length" class="template-row">
             <el-button type="primary" link @click="downloadTemplate">
                 <el-icon><Download /></el-icon>
@@ -28,10 +26,8 @@
             </el-button>
         </div>
 
-        <!-- Error alert -->
         <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon :closable="false" class="mt-12" />
 
-        <!-- Submitting alert -->
         <el-alert
             v-if="submitting"
             title="导入进行中，请勿刷新页面或关闭窗口，否则可能导致数据不完整"
@@ -40,7 +36,6 @@
             :closable="false"
             class="mt-12" />
 
-        <!-- File info + data preview -->
         <div v-if="parsedData.length > 0" class="preview-area">
             <div class="file-header">
                 <el-descriptions :column="2" border size="small" style="flex: 1">
@@ -61,7 +56,6 @@
                     show-overflow-tooltip />
             </el-table>
 
-            <!-- Progress -->
             <div v-if="submitting || progress.total > 0" class="progress-box mt-12">
                 <div class="progress-text">
                     进度：{{ progress.done }} / {{ progress.total }}
@@ -76,19 +70,21 @@
         </div>
 
         <template #footer>
-            <el-button style="min-width: 120px" @click="onCloseDialog" :disabled="submitting">取 消</el-button>
-            <el-button style="min-width: 120px" type="primary" :loading="submitting" :disabled="parsedData.length === 0" @click="onSubmit">
-                {{ submitting ? `导入中 (${progress.done}/${progress.total})` : `导入（${parsedData.length} 条）` }}
-            </el-button>
+            <el-space>
+                <el-button style="min-width: 120px" @click="onCloseDialog" :disabled="submitting">取 消</el-button>
+                <el-button style="min-width: 120px" type="primary" :loading="submitting" :disabled="parsedData.length === 0" @click="onSubmit">
+                    {{ submitting ? `导入中 (${progress.done}/${progress.total})` : `导入（${parsedData.length} 条）` }}
+                </el-button>
+            </el-space>
         </template>
     </el-dialog>
 </template>
 
 <script>
-import dayjs from "dayjs";
 import { Download, UploadFilled } from "@element-plus/icons-vue";
 import { AddTransactions } from "../../api/basic.js";
 import { msg } from "../../utils/message.ts";
+import { formatOccTimeForImport } from "./utils.js";
 
 const MAX_CONCURRENCY = 10;
 const LEAVE_TIP = "导入正在进行中，离开页面可能导致数据不完整，确定要离开吗？";
@@ -96,15 +92,16 @@ const LEAVE_TIP = "导入正在进行中，离开页面可能导致数据不完�
 // Detail example (real JSON string, not placeholder text).
 // Second row leaves detail empty to demonstrate "no detail items".
 const TEMPLATE_ROWS = [
-    ["cid", "occ_time", "amount", "remark", "detail"],
+    ["cid", "occ_time", "amount", "remark", "detail", "tags"],
     [
         "1002",
         "2025-09-24 20:15:42",
         "-333.12",
         "示例备注（支出金额为负数）（cid为分类id，在分类管理中查询）",
         '[{"name":"鸡蛋","quantity":1,"price":21,"total":21,"unit":"盘"}]',
+        "餐饮,聚餐",
     ],
-    ["5006", "2025-09-24 20:15:42", "100", "示例备注（收入金额为正数）", ""],
+    ["5006", "2025-09-24 20:15:42", "100", "示例备注（收入金额为正数）", "", ""],
 ];
 
 const TABLE_COLUMNS = [
@@ -113,6 +110,7 @@ const TABLE_COLUMNS = [
     { prop: "amount", label: "amount", width: 90 },
     { prop: "remark", label: "remark", minWidth: 110 },
     { prop: "detail", label: "明细", minWidth: 200 },
+    { prop: "tags", label: "标签", minWidth: 140 },
 ];
 
 const emptyProgress = () => ({ total: 0, done: 0, success: 0, fail: 0 });
@@ -182,7 +180,6 @@ export default {
             URL.revokeObjectURL(url);
         },
 
-        // Close dialog: blocked while submitting
         onCloseDialog() {
             if (this.submitting) {
                 msg.warning("导入进行中，请等待完成后再关闭");
@@ -195,7 +192,6 @@ export default {
             this.resetAll();
         },
 
-        // Reset parsed state (file, preview, error, progress, elapsed)
         resetParsed() {
             this.fileName = "";
             this.parsedData = [];
@@ -204,7 +200,6 @@ export default {
             this.progress = emptyProgress();
         },
 
-        // Full reset: used on close / reselect
         resetAll() {
             this.resetParsed();
             this.submitting = false;
@@ -212,7 +207,6 @@ export default {
             this.removeBeforeUnload();
         },
 
-        // beforeunload guard
         handleBeforeUnload(e) {
             e.preventDefault();
             e.returnValue = LEAVE_TIP;
@@ -318,26 +312,48 @@ export default {
             });
         },
 
-        // Normalize occ_time to `YYYY-MM-DDTHH:mm:ss+0800`
-        formatOccTime(input) {
-            const str = String(input ?? "").trim();
-            if (!str) return "";
-            // Already in target format
-            if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0800$/.test(str)) return str;
+        /**
+         * Parse tags field.
+         * Accepts:
+         *  - JSON array string: ["餐饮","聚餐"]
+         *  - Delimited text: 餐饮|聚餐  or  餐饮,聚餐  or  餐饮、聚餐
+         *  - Empty -> []
+         * Returns a de-duplicated string array.
+         */
+        parseTags(raw) {
+            if (isBlank(raw)) return [];
+            const text = normalizeDetailText(raw).trim();
+            let list;
 
-            // Normalize Chinese/slash separators so dayjs can parse
-            const normalized = str.replace(/年|月/g, "-").replace(/日/g, "").replace(/\//g, "-");
-            const d = dayjs(normalized);
-            if (!d.isValid()) return str;
-            return d.format("YYYY-MM-DDTHH:mm:ss+0800");
+            if (text.startsWith("[")) {
+                let arr;
+                try {
+                    arr = JSON.parse(text);
+                } catch {
+                    throw new Error("tags 不是合法的 JSON 数组（如无标签请留空）");
+                }
+                if (!Array.isArray(arr)) throw new Error("tags 必须是数组");
+                list = arr;
+            } else {
+                list = text.split(/[|,，、]/);
+            }
+
+            const result = [];
+            const seen = new Set();
+            list.forEach((t) => {
+                const s = String(t ?? "").trim();
+                if (s && !seen.has(s)) {
+                    seen.add(s);
+                    result.push(s);
+                }
+            });
+            return result;
         },
 
-        // Build one transaction payload from a CSV row.
-        // Throws when detail is malformed or has blank fields (message includes rowNo).
         buildTransaction(row, rowNo) {
             const tx = {
                 cid: row.cid !== "" ? Number(row.cid) : undefined,
-                occ_time: this.formatOccTime(row.occ_time),
+                occ_time: formatOccTimeForImport(row.occ_time),
                 amount: row.amount !== "" ? Number(row.amount) : undefined,
                 total: Number(row.total) || 1,
                 remark: row.remark || "",
@@ -368,7 +384,6 @@ export default {
                         detailErrors.push(`明细${itemNo} 缺少/无效字段：${miss.join("、")}`);
                     }
 
-                    // 保留原始字段（含 name 等），仅对数值字段做类型转换
                     return {
                         ...d,
                         name: String(d.name ?? "").trim(),
@@ -384,11 +399,21 @@ export default {
                 }
             }
 
+            const rawTags = row.tags;
+            if (rawTags && String(rawTags).trim() !== "") {
+                let tags;
+                try {
+                    tags = this.parseTags(rawTags);
+                } catch (e) {
+                    throw new Error(`第 ${rowNo} 行 ${e.message}`, { cause: e });
+                }
+                if (tags.length) tx.tags = tags;
+            }
+
             Object.keys(tx).forEach((k) => tx[k] === undefined && delete tx[k]);
             return tx;
         },
 
-        // Submit with a concurrency pool (max MAX_CONCURRENCY in flight)
         async onSubmit() {
             if (!this.parsedData.length) return;
 
