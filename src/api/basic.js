@@ -39,10 +39,12 @@ export const GetChartYear = (params) => ajax(`/api/ledger/v1/stat/chart/year`, "
 // DELETE /v1/category/:category_id       删除分类
 //   POST /v1/category/:category_id/sub   添加子分类 body:{"name":"加油"}
 //   POST /v1/category/main               添加主分类 body:{"name":"小车","direction":2}  direction => 1:收入,2:支出
+//  PATCH /v1/category/:id                修改分类名称body:{"name":"新名称"}
 export const Getcategory = (params) => ajax("/api/ledger/v1/category", "GET", params, null);
 export const DelCategory = (id) => ajax(`/api/ledger/v1/category/${id}`, "DELETE", null, null);
 export const AddSubCategory = (paths, data) => ajax(`/api/ledger/v1/category/${paths.id}/sub`, "POST", null, data);
 export const AddMainCategory = (data) => ajax(`/api/ledger/v1/category/main`, "POST", null, data);
+export const EditCategory = (id, data) => ajax(`/api/ledger/v1/category/${id}`, "PATCH", null, data);
 
 // 标签
 //   GET /v1/tags/hot         高频推荐标签 ?limit=10

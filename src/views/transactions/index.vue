@@ -44,16 +44,19 @@
                                         <el-input v-model="searchForm.keyword" clearable placeholder="备注" style="width: 100%" @keyup.enter="onSearch" />
                                     </el-form-item>
                                     <el-form-item label="分类">
-                                        <el-tree-select
-                                            v-model="searchForm.cid"
-                                            :data="categoryTree"
-                                            :props="{ label: 'name', value: 'id', children: 'children' }"
-                                            check-strictly
-                                            clearable
-                                            filterable
-                                            :teleported="false"
-                                            placeholder="全部分类"
-                                            style="width: 100%" />
+                                        <div class="category-row">
+                                            <el-tree-select
+                                                v-model="searchForm.cid"
+                                                :data="categoryTree"
+                                                :props="{ label: 'name', value: 'id', children: 'children' }"
+                                                check-strictly
+                                                clearable
+                                                filterable
+                                                :teleported="false"
+                                                placeholder="全部分类"
+                                                style="flex: 1; min-width: 0" />
+                                            <el-checkbox v-model="searchForm.children" class="children-checkbox">含子类</el-checkbox>
+                                        </div>
                                     </el-form-item>
                                     <el-form-item label="收支">
                                         <el-radio-group v-model="searchForm.direction" class="direction-radio-group">
@@ -75,10 +78,27 @@
                                     </el-form-item>
                                     <el-form-item label="金额">
                                         <div class="amount-range">
-                                            <el-input v-model="searchForm.min_amount" placeholder="最小" clearable style="width: 120px" />
+                                            <el-input v-model="searchForm.min_amount" placeholder="最小" clearable class="amount-input" />
                                             <span class="amount-sep">-</span>
-                                            <el-input v-model="searchForm.max_amount" placeholder="最大" clearable style="width: 120px" />
+                                            <el-input v-model="searchForm.max_amount" placeholder="最大" clearable class="amount-input" />
                                         </div>
+                                    </el-form-item>
+                                    <el-form-item label="标签">
+                                        <el-select
+                                            v-model="searchForm.tag"
+                                            filterable
+                                            remote
+                                            clearable
+                                            allow-create
+                                            default-first-option
+                                            :reserve-keyword="false"
+                                            :remote-method="onTagSearch"
+                                            :loading="tagLoading"
+                                            placeholder="选择或输入标签"
+                                            :teleported="false"
+                                            style="width: 100%">
+                                            <el-option v-for="item in tagOptions" :key="item.name" :label="item.name" :value="item.name" />
+                                        </el-select>
                                     </el-form-item>
                                     <el-form-item label="排序">
                                         <div class="sort-row">
@@ -105,10 +125,10 @@
                                             </el-select>
                                         </div>
                                     </el-form-item>
-                                    <el-form-item>
-                                        <el-button type="primary" @click="onSearch">查询</el-button>
-                                        <el-button @click="onResetSearch">重置</el-button>
-                                        <el-button @click="advancedVisible = false">取消</el-button>
+                                    <el-form-item class="form-actions">
+                                        <el-button type="primary" class="action-btn" @click="onSearch">查询</el-button>
+                                        <el-button class="action-btn" @click="onResetSearch">重置</el-button>
+                                        <el-button class="action-btn" @click="advancedVisible = false">取消</el-button>
                                     </el-form-item>
                                 </el-form>
                             </div>
@@ -116,7 +136,7 @@
 
                         <el-button type="success" @click="onImportBill">导入</el-button>
                         <el-button type="success" @click="onAddBill">记一笔</el-button>
-                        <el-button type="primary" :icon="Refresh" @click="onRefresh" :loading="loading">刷新</el-button>
+                        <el-button type="primary" :icon="Refresh" @click="onRefresh(true)" :loading="loading">刷新</el-button>
                     </el-space>
                 </div>
             </template>
@@ -164,6 +184,7 @@ import AddTransactions from "./AddTransactions.vue";
 import UpdateTransactions from "./update.vue";
 import ImportBill from "./import.vue";
 import TranDetail from "./detail.vue";
+import tagSelectMixin from "./tagSelectMixin.js";
 import { GetTransactions, Getcategory, DelTransactions } from "../../api/basic.js";
 import { msg } from "../../utils/message.ts";
 import { withDelay, convertToLimitOffset } from "../../utils/common.js";
@@ -171,7 +192,7 @@ import { getCategoryPath } from "../../utils/category.js";
 import { formatTime } from "../../utils/date.js";
 import { getRouteQuery } from "../../utils/routeQuery";
 import { SK_LEDGER_ALL_CATEGORY, DEFAULT_PAGE_SIZE, ONE_DAY_MS, SORT_WHITELIST, ORDER_WHITELIST, SEARCH_KEYS, QUERY_KEYS } from "./constants.js";
-import { formatAmountValue } from "./utils.js";
+import { formatAmountValue, readCategoryTree } from "./utils.js";
 
 function isEmpty(v) {
     return v === "" || v == null;
@@ -180,11 +201,13 @@ function isEmpty(v) {
 function emptySearchForm() {
     return {
         cid: null,
+        children: true,
         keyword: "",
         direction: 0,
         dateRange: null,
         min_amount: "",
         max_amount: "",
+        tag: "",
         sort: "",
         order: "",
     };
@@ -204,6 +227,7 @@ function isInsidePopper(target) {
 export default {
     name: "TransactionsIndex",
     components: { MyTable, AddTransactions, UpdateTransactions, TranDetail, ImportBill },
+    mixins: [tagSelectMixin],
     setup() {
         return { Refresh, ArrowLeft, ArrowRight };
     },
@@ -226,6 +250,8 @@ export default {
             isReady: false,
             advancedVisible: false,
             searchForm: emptySearchForm(),
+            categoryPromise: null,
+            hasInitialLoaded: false,
         };
     },
     computed: {
@@ -236,10 +262,12 @@ export default {
             const f = this.searchForm;
             return [
                 f.cid,
+                f.cid && f.children ? 1 : null,
                 f.direction,
                 Array.isArray(f.dateRange) && f.dateRange.length === 2 ? 1 : null,
                 isEmpty(f.min_amount) ? null : 1,
                 isEmpty(f.max_amount) ? null : 1,
+                isEmpty(f.tag) ? null : 1,
                 f.sort ? 1 : null,
                 f.order ? 1 : null,
             ].filter(Boolean).length;
@@ -251,17 +279,21 @@ export default {
     beforeUnmount() {
         document.removeEventListener("click", this.handleOutsideClick, true);
         this.$globalBus.off("onRefresh", this.refreshHandler);
+        this.categoryPromise = null;
     },
     created() {
         this.$globalBus.emit("updateActivePath", "/transactions");
-        this.refreshHandler = () => this.onRefresh();
+
+        this.refreshHandler = () => {
+            this.loadGetBill(this.pageSize, this.page);
+        };
         this.$globalBus.on("onRefresh", this.refreshHandler);
 
         this.restoreFromUrl();
         this.$nextTick(() => {
             this.isReady = true;
         });
-        this.onRefresh();
+        this.onRefresh(true);
     },
     methods: {
         formatDate(time) {
@@ -270,10 +302,6 @@ export default {
         formatAmount(value) {
             return formatAmountValue(value);
         },
-        /**
-         * 金额颜色：>0 收入、<0 支出、0 或无效值不着色
-         * 颜色语义与 detail.vue 保持一致
-         */
         amountClass(amount) {
             const n = Number(amount);
             if (Number.isNaN(n) || n === 0) return "";
@@ -309,6 +337,7 @@ export default {
             const f = this.searchForm;
             const p = {};
             if (f.cid) p.cid = f.cid;
+            if (f.cid && f.children) p.children = true;
             if (f.keyword) p.keyword = f.keyword.trim();
             if (f.direction) p.direction = f.direction;
             if (Array.isArray(f.dateRange) && f.dateRange.length === 2) {
@@ -317,6 +346,10 @@ export default {
             }
             if (!isEmpty(f.min_amount)) p.min_amount = String(f.min_amount);
             if (!isEmpty(f.max_amount)) p.max_amount = String(f.max_amount);
+            if (!isEmpty(f.tag)) {
+                const t = String(f.tag).trim();
+                if (t) p.tag = t;
+            }
             if (SORT_WHITELIST.includes(f.sort)) p.sort = f.sort;
             if (ORDER_WHITELIST.includes(f.order)) p.order = f.order;
             return p;
@@ -368,11 +401,14 @@ export default {
             this.loadGetBill(this.pageSize, 1);
         },
 
+        /**
+         * pagination 组件 mounted 时会 emit syncsize，
+         * 但首次加载已由 created 的 onRefresh 负责，这里只同步参数，不重复请求
+         */
         onSyncsize(s, p) {
             this.pageSize = s;
             this.page = p;
             this.syncToUrl();
-            this.onRefresh();
         },
         onCurrentChange(p) {
             this.page = p;
@@ -386,23 +422,13 @@ export default {
             this.loadGetBill(s, 1);
         },
 
-        readCategoryTree() {
-            try {
-                const str = window.localStorage.getItem(SK_LEDGER_ALL_CATEGORY);
-                return str ? JSON.parse(str) : [];
-            } catch (e) {
-                msg.error("分类数据解析失败：" + e);
-                return [];
-            }
-        },
-
         async loadGetBill(pageSize, page) {
             this.loading = true;
             const params = { ...convertToLimitOffset(page, pageSize), ...this.buildSearchParams() };
             try {
                 const res = await withDelay(() => GetTransactions(params));
                 const items = res.payload?.items || [];
-                const tree = this.readCategoryTree();
+                const tree = readCategoryTree();
                 items.forEach((item) => {
                     item.category_title = getCategoryPath(tree, item.category_id) || "未知分类";
                 });
@@ -415,29 +441,45 @@ export default {
             }
         },
 
-        async loadGetCategory() {
-            try {
-                const results = await Promise.allSettled([Getcategory({ direction: 1 }), Getcategory({ direction: 2 })]);
-                const list = [];
-                results.forEach((r) => {
-                    if (r.status === "fulfilled") {
-                        const items = r.value.payload?.items;
-                        if (Array.isArray(items)) list.push(...items);
-                    } else {
-                        console.error("Category sub-request failed:", r.reason);
-                    }
-                });
-                window.localStorage.setItem(SK_LEDGER_ALL_CATEGORY, JSON.stringify(list));
-                this.category = list;
-            } catch (err) {
-                msg.error("分类加载异常：" + err);
-            }
+        // 加载分类
+        async loadGetCategory(force = false) {
+            if (!force && this.category.length > 0) return this.category;
+            if (this.categoryPromise) return this.categoryPromise;
+
+            this.categoryPromise = (async () => {
+                try {
+                    const results = await Promise.allSettled([Getcategory({ direction: 1 }), Getcategory({ direction: 2 })]);
+                    const list = [];
+                    results.forEach((r) => {
+                        if (r.status === "fulfilled") {
+                            const items = r.value.payload?.items;
+                            if (Array.isArray(items)) list.push(...items);
+                        } else {
+                            console.error("Category sub-request failed:", r.reason);
+                        }
+                    });
+                    window.localStorage.setItem(SK_LEDGER_ALL_CATEGORY, JSON.stringify(list));
+                    this.category = list;
+                    return list;
+                } catch (err) {
+                    msg.error("分类加载异常：" + err);
+                    return this.category;
+                } finally {
+                    this.categoryPromise = null;
+                }
+            })();
+
+            return this.categoryPromise;
         },
 
-        async onRefresh() {
+        async onRefresh(force = false) {
             this.loading = true;
-            await this.loadGetCategory();
-            this.loadGetBill(this.pageSize, this.page);
+            try {
+                await this.loadGetCategory(force);
+                await this.loadGetBill(this.pageSize, this.page);
+            } finally {
+                this.loading = false;
+            }
         },
 
         onImportBill() {
@@ -463,7 +505,7 @@ export default {
                 .then(async () => {
                     await DelTransactions(val.id);
                     msg.success("删除成功");
-                    this.onRefresh();
+                    this.loadGetBill(this.pageSize, this.page);
                 })
                 .catch((err) => {
                     if (err) msg.error("删除失败：" + (err?.data?.metadata?.message || "未知错误"));
@@ -479,6 +521,8 @@ export default {
 
             const f = this.searchForm;
             f.cid = saved.cid ? Number(saved.cid) : null;
+            f.children = saved.children === true || saved.children === "true";
+            if (!saved.cid) f.children = true;
             f.keyword = saved.keyword || "";
             f.direction = saved.direction ? Number(saved.direction) : 0;
             if (saved.from && saved.to) {
@@ -488,6 +532,16 @@ export default {
             }
             f.min_amount = saved.min_amount || "";
             f.max_amount = saved.max_amount || "";
+
+            const rawTag = saved.tag;
+            if (Array.isArray(rawTag)) {
+                f.tag = rawTag.length > 0 ? String(rawTag[0]).trim() : "";
+            } else if (typeof rawTag === "string") {
+                f.tag = rawTag.trim();
+            } else {
+                f.tag = "";
+            }
+
             f.sort = SORT_WHITELIST.includes(saved.sort) ? saved.sort : "";
             f.order = ORDER_WHITELIST.includes(saved.order) ? saved.order : "";
         },
@@ -512,10 +566,16 @@ export default {
 .amount-range {
     display: flex;
     align-items: center;
+    width: 100%;
+}
+.amount-input {
+    flex: 1;
+    min-width: 0;
 }
 .amount-sep {
     margin: 0 6px;
     color: #999;
+    flex-shrink: 0;
 }
 .direction-radio-group {
     display: flex;
@@ -532,6 +592,16 @@ export default {
     display: flex;
     align-items: center;
     width: 100%;
+}
+.form-actions :deep(.el-form-item__content) {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+.action-btn {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
 }
 .advanced-btn {
     position: relative;
@@ -555,5 +625,15 @@ export default {
 }
 .expense-text {
     color: var(--color-expense);
+}
+.category-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.children-checkbox {
+    flex-shrink: 0;
+    margin: 0;
 }
 </style>

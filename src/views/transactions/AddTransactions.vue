@@ -254,7 +254,15 @@ export default {
             if (this.detailRows[index]) calcRowTotal(this.detailRows[index]);
         },
         copyDetailsJson() {
-            copyText(serializeDetailRows(this.detailRows), msg.success, msg.error);
+            if (!this.detailRows.length) {
+                msg.warning("暂无明细可复制");
+                return;
+            }
+            copyText(
+                serializeDetailRows(this.detailRows),
+                () => msg.success("明细已复制到剪贴板"),
+                () => msg.error("复制失败"),
+            );
         },
         appendSeparator(sep) {
             const input = this.$refs.remarkInput?.$el?.querySelector("input");

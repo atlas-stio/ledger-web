@@ -33,6 +33,9 @@
                             <span class="main-dot" />
                             <span class="main-name" :title="cat.name">{{ cat.name }}</span>
                             <span class="main-count">{{ cat.children?.length ?? 0 }}</span>
+                            <button class="main-edit" title="修改名称" @click.stop="openEdit(panel.direction, cat)">
+                                <el-icon><Edit /></el-icon>
+                            </button>
                         </article>
                     </div>
                     <el-empty v-else description="暂无主分类" :image-size="56" />
@@ -56,6 +59,9 @@
                             <li v-for="sub in current.children" :key="sub.id" class="sub-item">
                                 <span class="sub-item-dot" />
                                 <span class="sub-item-name" :title="sub.name">{{ sub.name }}</span>
+                                <button class="sub-item-edit" title="修改名称" @click.stop="openEdit(currentDirection, sub)">
+                                    <el-icon><Edit /></el-icon>
+                                </button>
                                 <button class="sub-item-del" title="删除" @click="removeSub(sub)">
                                     <el-icon><Delete /></el-icon>
                                 </button>
@@ -96,8 +102,8 @@
 
 <script>
 import { ElMessageBox } from "element-plus";
-import { Delete, Grid, Plus, Refresh, ShoppingCart, TrendCharts } from "@element-plus/icons-vue";
-import { AddMainCategory, AddSubCategory, DelCategory, Getcategory } from "../../api/basic.js";
+import { Delete, Edit, Grid, Plus, Refresh, ShoppingCart, TrendCharts } from "@element-plus/icons-vue";
+import { AddMainCategory, AddSubCategory, DelCategory, EditCategory, Getcategory } from "../../api/basic.js";
 import { withDelay } from "../../utils/common.js";
 import { msg } from "../../utils/message.ts";
 import { setRouteQuery, getRouteQuery } from "../../utils/routeQuery";
@@ -117,7 +123,7 @@ function normalizeCategories(list) {
 export default {
     name: "CategoryIndex",
     setup() {
-        return { Grid, Refresh, Plus, Delete };
+        return { Grid, Refresh, Plus, Delete, Edit };
     },
     data() {
         return {
@@ -134,6 +140,7 @@ export default {
                 action: "main",
                 direction: DIRECTIONS.INCOME,
                 parentId: null,
+                editId: null,
                 submitting: false,
             },
         };
@@ -230,8 +237,22 @@ export default {
                 action,
                 parentId: parent?.id ?? null,
                 parentName: parent?.name ?? "",
+                editId: null,
                 name: "",
                 title: action === "main" ? "新增主分类" : "新增子分类",
+                visible: true,
+            });
+        },
+
+        openEdit(direction, cat) {
+            Object.assign(this.dialog, {
+                direction,
+                action: "edit",
+                parentId: null,
+                parentName: "",
+                editId: cat.id,
+                name: cat.name,
+                title: "修改分类名称",
                 visible: true,
             });
         },
@@ -245,15 +266,18 @@ export default {
                 if (this.dialog.action === "main") {
                     await withDelay(() => AddMainCategory({ name, direction: this.dialog.direction }));
                     msg.success("新增主分类成功");
-                } else {
+                } else if (this.dialog.action === "sub") {
                     await withDelay(() => AddSubCategory({ id: this.dialog.parentId }, { name }));
                     msg.success("新增子分类成功");
+                } else if (this.dialog.action === "edit") {
+                    await withDelay(() => EditCategory(this.dialog.editId, { name }));
+                    msg.success("修改成功");
                 }
                 this.dialog.visible = false;
                 await this.loadAll();
             } catch (error) {
-                console.error("新增分类失败：", error);
-                msg.error("新增分类失败，请稍后重试");
+                console.error("提交分类失败：", error);
+                msg.error(this.dialog.action === "edit" ? "修改失败，请稍后重试" : "新增分类失败，请稍后重试");
             } finally {
                 this.dialog.submitting = false;
             }
@@ -462,6 +486,10 @@ export default {
     &:hover {
         border-color: var(--accent-border);
         background: var(--el-fill-color-lighter);
+
+        .main-edit {
+            opacity: 1;
+        }
     }
 
     &.active {
@@ -505,6 +533,32 @@ export default {
     line-height: 18px;
     color: var(--el-text-color-secondary);
     background: var(--el-fill-color);
+}
+
+.main-edit,
+.sub-item-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 13px;
+    color: var(--el-text-color-secondary);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+        opacity 0.15s ease,
+        background-color 0.15s ease,
+        color 0.15s ease;
+
+    &:hover {
+        color: var(--el-color-primary);
+        background: var(--el-color-primary-light-9);
+    }
 }
 
 /* ========== 右列：子分类详情 ========== */
@@ -589,7 +643,8 @@ export default {
         background: var(--accent-soft);
         border-color: var(--accent-border);
 
-        .sub-item-del {
+        .sub-item-del,
+        .sub-item-edit {
             opacity: 1;
         }
     }
