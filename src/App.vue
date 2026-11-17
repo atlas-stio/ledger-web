@@ -1,20 +1,11 @@
-<script>
-export default {
-    data() {
-        return {
-            size: "default", // 可选值: large/default/small
-        };
-    },
-    created() {},
-};
+<script setup>
+import zhCn from "element-plus/es/locale/lang/zh-cn";
 </script>
 
 <template>
-    <el-config-provider size="default">
+    <el-config-provider :locale="zhCn">
         <div>
             <router-view />
         </div>
     </el-config-provider>
 </template>
-
-<style scoped></style>

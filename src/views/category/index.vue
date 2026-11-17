@@ -427,7 +427,6 @@ export default {
         },
     },
     created() {
-        this.$globalBus?.emit("updateActivePath", "/category");
         this.restoreFromUrl();
         this.$nextTick(() => {
             this.isReady = true;

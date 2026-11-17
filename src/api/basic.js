@@ -22,9 +22,9 @@ export const AddTransactions = (data) => ajax("/api/ledger/v1/transactions", "PO
 export const EditTransactions = (id, data) => ajax(`/api/ledger/v1/transactions/${id}`, "PATCH", null, data);
 export const DelTransactions = (id) => ajax(`/api/ledger/v1/transactions/${id}`, "DELETE", null, null);
 export const GetTranDetails = (id) => ajax(`/api/ledger/v1/transactions/${id}`, "GET", null, null);
-
 export const GetStatistic = (params) => ajax("/api/ledger/v1/bill/statistic", "GET", params, null);
 export const GetBillDetails = (id) => ajax(`/api/ledger/v1/bill/${id}`, "GET", null, null);
+export const getDetailList = (params) => ajax(`/api/ledger/v1/details`, "GET", params, null);
 
 // 数据总览
 export const GetCycleSummary = (params) => ajax(`/api/ledger/v1/stat/cycle-summary`, "GET", params, null);

@@ -126,8 +126,6 @@ export default {
         },
     },
     created() {
-        this.$globalBus.emit("updateActivePath", "/overview");
-
         const saved = getRouteQuery(this.$route, QUERY_KEYS, QUERY_DEFAULTS);
 
         // 关键修复：URL 里的 "2024" 会被 parseQueryValue 还原成数字 2024，

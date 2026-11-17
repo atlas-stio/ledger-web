@@ -8,6 +8,7 @@ const Layout = () => import("../views/layout/index.vue");
 const Transactions = () => import("../views/transactions/index.vue");
 const Category = () => import("../views/category/index.vue");
 const Calendar = () => import("../views/calendar/index.vue");
+const Details = () => import("../views/details/index.vue");
 
 // 移动端
 const MobileLayout = () => import("../mobile/layout/index.vue");
@@ -42,11 +43,12 @@ const generateChildren = () => {
     }
     // 电脑端路由树
     return [
-        { meta: { title: "首页" }, path: "/", name: "home", component: Home },
-        { meta: { title: "数据总览" }, path: "/overview", name: "overview", component: Overview },
-        { meta: { title: "记账管理" }, path: "/transactions", name: "transactions", component: Transactions },
-        { meta: { title: "日历视图" }, path: "/calendar", name: "Calendar", component: Calendar },
-        { meta: { title: "分类管理" }, path: "/category", name: "category", component: Category },
+        { meta: { title: "首页", am: "/" }, path: "/", name: "home", component: Home },
+        { meta: { title: "数据总览", am: "/overview" }, path: "/overview", name: "overview", component: Overview },
+        { meta: { title: "记账管理", am: "/transactions" }, path: "/transactions", name: "transactions", component: Transactions },
+        { meta: { title: "明细查询", am: "/details" }, path: "/details", name: "details", component: Details },
+        { meta: { title: "日历视图", am: "/calendar" }, path: "/calendar", name: "Calendar", component: Calendar },
+        { meta: { title: "分类管理", am: "/category" }, path: "/category", name: "category", component: Category },
     ];
 };
 

@@ -16,8 +16,12 @@
                         <el-icon><Tickets /></el-icon>
                         <template #title><span>记账管理</span></template>
                     </el-menu-item>
+                    <el-menu-item index="/details" @click="OnSwitchRoutes('/details')">
+                        <el-icon><Search /></el-icon>
+                        <template #title><span>明细查询</span></template>
+                    </el-menu-item>
                     <el-menu-item index="/category" @click="OnSwitchRoutes('/category')">
-                        <el-icon><User /></el-icon>
+                        <el-icon><PriceTag /></el-icon>
                         <template #title><span>分类管理</span></template>
                     </el-menu-item>
                 </el-menu>
@@ -29,31 +33,22 @@
 <script>
 export default {
     name: "AppAside",
-    components: {},
     props: {},
-    data() {
-        return {
-            activePath: "",
-        };
-    },
-    computed: {},
-    watch: {},
-    methods: {
-        OnSwitchRoutes(activePath) {
-            this.$router.push({ path: activePath });
+    computed: {
+        activePath() {
+            return this.$route.meta.am || this.$route.path;
         },
     },
-    created() {
-        this.$globalBus.on("updateActivePath", (data) => {
-            this.activePath = data || "/";
-        });
+    methods: {
+        OnSwitchRoutes(path) {
+            this.$router.push({ path });
+        },
     },
 };
 </script>
 
 <style scoped>
 .el-aside {
-    /* 处理菜单右边的阴影 */
     background-color: #ffffff;
     .el-menu {
         border-right: none;

@@ -153,8 +153,6 @@ export default {
         },
     },
     created() {
-        this.$globalBus?.emit("updateActivePath", "/calendar");
-
         const saved = getRouteQuery(this.$route, QUERY_KEYS, QUERY_DEFAULTS);
         const parsed = this.parseMonthParam(saved.month);
         if (parsed) {

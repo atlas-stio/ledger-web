@@ -7,7 +7,7 @@ import "./styles/index.less";
 import "./styles/normalize.css";
 import App from "./App.vue";
 import * as ElementPlusIconsVue from "@element-plus/icons-vue";
-import zhCn from "element-plus/es/locale/lang/zh-cn";
+// import zhCn from "element-plus/es/locale/lang/zh-cn";
 import config from "./config/config";
 
 import vueCookies from "vue-cookies";
@@ -19,9 +19,7 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 
 app.config.globalProperties.$config = config;
-app.use(ElementPlus, {
-    locale: zhCn,
-});
+app.use(ElementPlus);
 app.use(router);
 app.use(EventBusPlugin);
 app.use(vueCookies);

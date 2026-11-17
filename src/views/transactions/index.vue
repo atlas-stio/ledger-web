@@ -282,8 +282,6 @@ export default {
         this.categoryPromise = null;
     },
     created() {
-        this.$globalBus.emit("updateActivePath", "/transactions");
-
         this.refreshHandler = () => {
             this.loadGetBill(this.pageSize, this.page);
         };
