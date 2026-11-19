@@ -9,6 +9,7 @@ const Transactions = () => import("../views/transactions/index.vue");
 const Category = () => import("../views/category/index.vue");
 const Calendar = () => import("../views/calendar/index.vue");
 const Details = () => import("../views/details/index.vue");
+const EPrint = () => import("../views/eprint/index.vue");
 
 // 移动端
 const MobileLayout = () => import("../mobile/layout/index.vue");
@@ -49,6 +50,7 @@ const generateChildren = () => {
         { meta: { title: "明细查询", am: "/details" }, path: "/details", name: "details", component: Details },
         { meta: { title: "日历视图", am: "/calendar" }, path: "/calendar", name: "Calendar", component: Calendar },
         { meta: { title: "分类管理", am: "/category" }, path: "/category", name: "category", component: Category },
+        { meta: { title: "打印归档", am: "/eprinter" }, path: "/eprinter", name: "eprint", component: EPrint },
     ];
 };
 

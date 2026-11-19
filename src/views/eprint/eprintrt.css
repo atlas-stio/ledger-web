@@ -1,0 +1,116 @@
+.a4-sheet {
+    padding: 2px;
+    .sheet-header {
+        text-align: center;
+        border-bottom: 1px dotted #303133;
+        padding-bottom: 5px;
+        margin-bottom: 8px;
+
+        .sheet-title {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        .sheet-sub {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+    }
+
+    .summary-list {
+        padding: 4px;
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dotted #ddd;
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            .num {
+                font-weight: 700;
+            }
+        }
+    }
+
+    .remark-row {
+        margin-top: 16px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+
+        .remark-label {
+            white-space: nowrap;
+        }
+
+        .remark-text {
+            flex: 1;
+            border-bottom: 1px dashed #333;
+            display: inline-block;
+
+            &:empty::before {
+                content: "\00A0";
+            }
+        }
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        margin-bottom: 16px;
+
+        th,
+        td {
+            border: 1px solid black;
+            text-align: center;
+            padding: 4px;
+        }
+
+        .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .empty {
+            text-align: center;
+            color: #666;
+            padding: 6px 0;
+        }
+
+        .remark-cell {
+            word-break: break-all;
+        }
+    }
+
+    .cat-list {
+        padding: 4px;
+
+        .cat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+
+            .cat-name {
+                text-align: left;
+            }
+        }
+
+        .cat-total {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 4px;
+            margin-top: 4px;
+            border-top: 1px dotted #aaa;
+            font-weight: bold;
+        }
+    }
+}

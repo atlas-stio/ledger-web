@@ -24,6 +24,10 @@
                         <el-icon><PriceTag /></el-icon>
                         <template #title><span>分类管理</span></template>
                     </el-menu-item>
+                    <el-menu-item index="/eprinter" @click="OnSwitchRoutes('/eprinter')">
+                        <el-icon><Printer /></el-icon>
+                        <template #title><span>打印归档</span></template>
+                    </el-menu-item>
                 </el-menu>
             </el-aside>
         </div>
