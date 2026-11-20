@@ -27,19 +27,19 @@
                                     <div class="summary-list">
                                         <div class="summary-item">
                                             <span>总收入</span>
-                                            <span class="num income">{{ formatAmount(summary.income) }}</span>
+                                            <span class="fw-7 income">{{ formatAmount(summary.income) }}</span>
                                         </div>
                                         <div class="summary-item">
                                             <span>总支出</span>
-                                            <span class="num expense">{{ formatAmount(summary.expense) }}</span>
+                                            <span class="fw-7 expense">{{ formatAmount(summary.expense) }}</span>
                                         </div>
                                         <div class="summary-item">
                                             <span>结余</span>
-                                            <span class="num" :class="summary.balance >= 0 ? 'income' : 'expense'">{{ formatAmount(summary.balance) }}</span>
+                                            <span class="fw-7" :class="summary.balance >= 0 ? 'income' : 'expense'">{{ formatAmount(summary.balance) }}</span>
                                         </div>
                                         <div class="summary-item">
                                             <span>笔数</span>
-                                            <span class="num">{{ summary.count }}</span>
+                                            <span class="fw-7">{{ summary.count }}</span>
                                         </div>
                                     </div>
                                 </td>
@@ -48,11 +48,11 @@
                                         <div v-if="incomeCategoryRows.length === 0" class="empty">本月暂无收入</div>
                                         <div v-for="row in incomeCategoryRows" :key="'i-' + row.categoryId" class="cat-item">
                                             <span class="cat-name">{{ row.categoryName }}</span>
-                                            <span class="num income">{{ formatAmount(row.amount) }}</span>
+                                            <span class="fw-7 income">{{ formatAmount(row.amount) }}</span>
                                         </div>
                                         <div v-if="incomeCategoryRows.length > 0" class="cat-total">
                                             <span>收入合计</span>
-                                            <span class="num income">{{ formatAmount(summary.income) }}</span>
+                                            <span class="fw-7 income">{{ formatAmount(summary.income) }}</span>
                                         </div>
                                     </div>
                                 </td>
@@ -61,11 +61,11 @@
                                         <div v-if="expenseCategoryRows.length === 0" class="empty">本月暂无支出</div>
                                         <div v-for="row in expenseCategoryRows" :key="'e-' + row.categoryId" class="cat-item">
                                             <span class="cat-name">{{ row.categoryName }}</span>
-                                            <span class="num expense">{{ formatAmount(row.amount) }}</span>
+                                            <span class="fw-7 expense">{{ formatAmount(row.amount) }}</span>
                                         </div>
                                         <div v-if="expenseCategoryRows.length > 0" class="cat-total">
                                             <span>支出合计</span>
-                                            <span class="num expense">{{ formatAmount(summary.expense) }}</span>
+                                            <span class="fw-7 expense">{{ formatAmount(summary.expense) }}</span>
                                         </div>
                                     </div>
                                 </td>
@@ -96,9 +96,9 @@
                             <tr v-for="(row, idx) in detailRows" :key="row.id || idx">
                                 <td v-if="row.dateRowspan > 0" :rowspan="row.dateRowspan">{{ row.dateText }}</td>
                                 <td>{{ row.categoryText }}</td>
-                                <td class="remark-cell">{{ row.remark || "-" }}</td>
-                                <td class="num" :class="row.direction === '收' ? 'income' : 'expense'">{{ row.direction }}</td>
-                                <td class="num" :class="row.direction === '收' ? 'income' : 'expense'">
+                                <td class="remark-cell">{{ row.remark || "" }}</td>
+                                <td>{{ row.direction === "收" ? "+" : "−" }}</td>
+                                <td class="num">
                                     {{ formatSignedAmount(row.signedAmount) }}
                                 </td>
                             </tr>
@@ -135,7 +135,7 @@
 
             <div class="panel-block">
                 <div class="block-label">备注</div>
-                <el-input v-model="remark" type="textarea" :rows="3" placeholder="归档备注（可选）" />
+                <el-input v-model="remark" type="textarea" :rows="3" placeholder="备注" />
             </div>
 
             <div class="panel-block">
@@ -165,8 +165,8 @@ import { withDelay, convertToLimitOffset } from "../../utils/common.js";
 import { getCategoryPath } from "../../utils/category.js";
 import { formatAmountValue } from "../../utils/utils.js";
 import { SK_LEDGER_ALL_CATEGORY } from "../../utils/constants.js";
-import { ePrinter } from "./print.js";
-import ePrintCss from "./eprintrt.css?raw";
+import { ePrinter } from "./printer.js";
+import ePrintCss from "./eprinter.css?raw";
 const PAGE_SIZE = 100;
 
 export default {
@@ -357,7 +357,7 @@ export default {
 </script>
 
 <style scoped>
-@import url(./eprintrt.css);
+@import url(./eprinter.css);
 .archive-page {
     display: flex;
     gap: 24px;

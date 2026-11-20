@@ -9,7 +9,7 @@ const Transactions = () => import("../views/transactions/index.vue");
 const Category = () => import("../views/category/index.vue");
 const Calendar = () => import("../views/calendar/index.vue");
 const Details = () => import("../views/details/index.vue");
-const EPrint = () => import("../views/eprint/index.vue");
+const EPrint = () => import("../views/eprinter/index.vue");
 
 // 移动端
 const MobileLayout = () => import("../mobile/layout/index.vue");

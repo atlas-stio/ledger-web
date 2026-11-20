@@ -1,5 +1,10 @@
 .a4-sheet {
     padding: 2px;
+
+    .fw-7 {
+        font-weight: 700;
+    }
+
     .sheet-header {
         text-align: center;
         border-bottom: 1px dotted #303133;
@@ -32,10 +37,6 @@
             &:last-child {
                 border-bottom: none;
             }
-
-            .num {
-                font-weight: 700;
-            }
         }
     }
 
@@ -45,7 +46,6 @@
         font-size: 13px;
         display: flex;
         align-items: baseline;
-        gap: 6px;
 
         .remark-label {
             white-space: nowrap;
@@ -66,14 +66,16 @@
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
-        margin-bottom: 16px;
+        font-family: Arial, sans-serif;
 
         th,
         td {
-            border: 1px solid black;
+            border: 1px solid #000000;
             text-align: center;
-            padding: 4px;
+            padding: 3px;
         }
+
+
 
         .num {
             text-align: right;
