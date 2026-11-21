@@ -364,70 +364,71 @@ export default {
     padding: 20px;
     min-height: 100vh;
     box-sizing: border-box;
+}
 
-    .side-panel {
-        width: 260px;
-        flex-shrink: 0;
-        background: #fff;
-        border-radius: 8px;
-        padding: 16px;
-        height: fit-content;
-        position: sticky;
-        top: 20px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        box-sizing: border-box;
+.archive-page .side-panel {
+    width: 260px;
+    flex-shrink: 0;
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    box-sizing: border-box;
+}
 
-        .panel-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: #303133;
-        }
+.archive-page .side-panel .panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #303133;
+}
 
-        .panel-block {
-            margin-bottom: 16px;
+.archive-page .side-panel .panel-block {
+    margin-bottom: 16px;
+}
 
-            .block-label {
-                font-size: 13px;
-                color: #606266;
-                margin-bottom: 6px;
-            }
+.archive-page .side-panel .panel-block .block-label {
+    font-size: 13px;
+    color: #606266;
+    margin-bottom: 6px;
+}
 
-            .month-nav {
-                display: flex;
-                gap: 6px;
-                margin-top: 8px;
+.archive-page .side-panel .panel-block .month-nav {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
 
-                .el-button {
-                    flex: 1;
-                }
-            }
-        }
+.archive-page .side-panel .panel-block .month-nav .el-button {
+    flex: 1;
+}
 
-        .btn-row {
-            display: flex;
-            gap: 8px;
+.archive-page .side-panel .btn-row {
+    display: flex;
+    gap: 8px;
+}
 
-            .el-button {
-                flex: 1;
-                width: 50%;
-                margin-left: 0;
-            }
-        }
-    }
+.archive-page .side-panel .btn-row .el-button {
+    flex: 1;
+    width: 50%;
+    margin-left: 0;
+}
 
-    .preview-area {
-        flex: 1;
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        .a4-sheet {
-            width: 210mm;
-            background: #fff;
-            padding: 50px;
-            box-sizing: border-box;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        }
-    }
+.archive-page .preview-area {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.archive-page .preview-area .a4-sheet {
+    width: 210mm;
+    background: #fff;
+    padding: 12mm;
+    box-sizing: border-box;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 </style>

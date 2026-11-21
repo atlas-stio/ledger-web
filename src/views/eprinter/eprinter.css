@@ -1,118 +1,112 @@
-.a4-sheet {
-    padding: 2px;
+.a4-sheet .fw-7 {
+    font-weight: 700;
+}
 
-    .fw-7 {
-        font-weight: 700;
-    }
+.a4-sheet .sheet-header {
+    text-align: center;
+    border-bottom: 1px dotted #303133;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+}
 
-    .sheet-header {
-        text-align: center;
-        border-bottom: 1px dotted #303133;
-        padding-bottom: 5px;
-        margin-bottom: 8px;
+.a4-sheet .sheet-header .sheet-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
 
-        .sheet-title {
-            font-size: 22px;
-            font-weight: 700;
-            letter-spacing: 2px;
-        }
+.a4-sheet .sheet-header .sheet-sub {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 13px;
+}
 
-        .sheet-sub {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 8px;
-            font-size: 13px;
-        }
-    }
+.a4-sheet .summary-list {
+    padding: 4px;
+}
 
-    .summary-list {
-        padding: 4px;
+.a4-sheet .summary-list .summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px dotted #ddd;
+}
 
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px dotted #ddd;
+.a4-sheet .summary-list .summary-item:last-child {
+    border-bottom: none;
+}
 
-            &:last-child {
-                border-bottom: none;
-            }
-        }
-    }
+.a4-sheet .remark-row {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    display: flex;
+    align-items: baseline;
+}
 
-    .remark-row {
-        margin-top: 16px;
-        margin-bottom: 8px;
-        font-size: 13px;
-        display: flex;
-        align-items: baseline;
+.a4-sheet .remark-row .remark-label {
+    white-space: nowrap;
+}
 
-        .remark-label {
-            white-space: nowrap;
-        }
+.a4-sheet .remark-row .remark-text {
+    flex: 1;
+    border-bottom: 1px dashed #333;
+    display: inline-block;
+}
 
-        .remark-text {
-            flex: 1;
-            border-bottom: 1px dashed #333;
-            display: inline-block;
+.a4-sheet .remark-row .remark-text:empty::before {
+    content: "\00A0";
+}
 
-            &:empty::before {
-                content: "\00A0";
-            }
-        }
-    }
+.a4-sheet table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: Arial, sans-serif;
+}
 
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-        font-family: Arial, sans-serif;
+.a4-sheet table th,
+.a4-sheet table td {
+    border: 1px solid #000000;
+    text-align: center;
+    padding: 3px;
+}
 
-        th,
-        td {
-            border: 1px solid #000000;
-            text-align: center;
-            padding: 3px;
-        }
+.a4-sheet table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
 
+.a4-sheet table .empty {
+    text-align: center;
+    color: #666;
+    padding: 6px 0;
+}
 
+.a4-sheet table .remark-cell {
+    word-break: break-all;
+}
 
-        .num {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
+.a4-sheet .cat-list {
+    padding: 4px;
+}
 
-        .empty {
-            text-align: center;
-            color: #666;
-            padding: 6px 0;
-        }
+.a4-sheet .cat-list .cat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+}
 
-        .remark-cell {
-            word-break: break-all;
-        }
-    }
+.a4-sheet .cat-list .cat-item .cat-name {
+    text-align: left;
+}
 
-    .cat-list {
-        padding: 4px;
-
-        .cat-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 3px 0;
-
-            .cat-name {
-                text-align: left;
-            }
-        }
-
-        .cat-total {
-            display: flex;
-            justify-content: space-between;
-            padding-top: 4px;
-            margin-top: 4px;
-            border-top: 1px dotted #aaa;
-            font-weight: bold;
-        }
-    }
+.a4-sheet .cat-list .cat-total {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 4px;
+    margin-top: 4px;
+    border-top: 1px dotted #aaa;
+    font-weight: bold;
 }
