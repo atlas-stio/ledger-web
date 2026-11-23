@@ -10,7 +10,6 @@ import * as ElementPlusIconsVue from "@element-plus/icons-vue";
 // import zhCn from "element-plus/es/locale/lang/zh-cn";
 import config from "./config/config";
 
-import vueCookies from "vue-cookies";
 const app = createApp(App);
 
 // 注册所有 ElementPlus 图标
@@ -22,7 +21,6 @@ app.config.globalProperties.$config = config;
 app.use(ElementPlus);
 app.use(router);
 app.use(EventBusPlugin);
-app.use(vueCookies);
 
 // 全局修改 ElDialog 默认配置（点击空白/ESC 不关闭弹窗）
 app._context.components.ElDialog["props"].closeOnClickModal.default = false;
