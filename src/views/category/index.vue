@@ -142,7 +142,7 @@
         </div>
     </el-card>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="440px" align-center>
+    <el-dialog :close-on-click-modal="false" v-model="dialog.visible" :title="dialog.title" width="440px" align-center>
         <el-form label-width="80px" @submit.prevent="submitCreate">
             <el-form-item label="分类名称" required>
                 <el-input v-model="dialog.name" maxlength="20" show-word-limit placeholder="请输入分类名称" @keyup.enter="submitCreate" />

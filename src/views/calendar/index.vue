@@ -61,7 +61,7 @@
         </div>
     </el-card>
 
-    <el-dialog v-model="detail.visible" :title="detail.title" width="420px" align-center>
+    <el-dialog :close-on-click-modal="false" v-model="detail.visible" :title="detail.title" width="420px" align-center>
         <div v-if="detail.day" class="detail-list">
             <div class="detail-row">
                 <span class="detail-label">

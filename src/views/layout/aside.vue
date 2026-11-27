@@ -17,7 +17,7 @@
                         <template #title><span>记账管理</span></template>
                     </el-menu-item>
                     <el-menu-item index="/details" @click="OnSwitchRoutes('/details')">
-                        <el-icon><Search /></el-icon>
+                        <el-icon><SearchIcon /></el-icon>
                         <template #title><span>明细查询</span></template>
                     </el-menu-item>
                     <el-menu-item index="/category" @click="OnSwitchRoutes('/category')">
@@ -35,8 +35,11 @@
 </template>
 
 <script>
+import { DataLine, Calendar, Tickets, Search as SearchIcon, PriceTag, Printer } from "@element-plus/icons-vue";
+
 export default {
     name: "AppAside",
+    components: { DataLine, Calendar, Tickets, SearchIcon, PriceTag, Printer },
     props: {},
     computed: {
         activePath() {
